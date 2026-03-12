@@ -313,3 +313,89 @@ body {
   box-shadow: 4px 0 10px rgba(0, 0, 0, 0.1);
   z-index: 1000;
 }
+
+
+/* admin_frontend/src/App.css */
+/* ... существующие стили ... */
+
+/* Table styles for exam results */
+.table-responsive {
+  border-radius: 0.5rem;
+  border: 1px solid #e5e7eb;
+}
+
+.table {
+  margin-bottom: 0;
+}
+
+.table th {
+  font-weight: 600;
+  background-color: #f8f9fa;
+  border-bottom: 2px solid #dee2e6;
+}
+
+.table td {
+  vertical-align: middle;
+}
+
+.badge {
+  font-weight: 500;
+  padding: 0.35em 0.65em;
+}
+
+/* File upload area */
+.form-control[type="file"] {
+  cursor: pointer;
+}
+
+.form-control[type="file"]:disabled {
+  background-color: #e9ecef;
+  cursor: not-allowed;
+}
+
+/* Stats cards */
+.text-primary { color: #0d6efd !important; }
+.text-success { color: #198754 !important; }
+.text-danger { color: #dc3545 !important; }
+.text-info { color: #0dcaf0 !important; }
+
+
+.ag-theme-alpine {
+  --ag-foreground-color: #333;
+  --ag-background-color: #fff;
+  --ag-header-background-color: #f8f9fa;
+  --ag-odd-row-background-color: #f8f9fa;
+  --ag-border-color: #dee2e6;
+  --ag-selected-row-background-color: rgba(13, 110, 253, 0.1);
+}
+
+.ag-theme-alpine .ag-header {
+  font-weight: 600;
+  background-color: #e9ecef;
+}
+
+.ag-theme-alpine .ag-cell {
+  border-color: #dee2e6;
+}
+
+.ag-theme-alpine .ag-cell-focus {
+  border: 2px solid #0d6efd;
+}
+
+.ag-theme-alpine .ag-row-hover {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+/* Loading spinner */
+.loading-spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+}
+
+/* Filter card */
+.card-header h5 {
+  font-size: 1rem;
+  font-weight: 600;
+}

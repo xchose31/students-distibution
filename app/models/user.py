@@ -49,11 +49,18 @@ class User(Base, UserMixin):
     def check_password(self, password):
         return self.password == password
 
+    def is_admin(self):
+        """Проверка прав администратора"""
+        if not self.person or not self.person.emp_post or not self.person.emp_post.role:
+            return False
+        return self.person.emp_post.role.role == 'distribution'
+
     def to_dict(self):
         return {
             'id': self.id,
             'username': self.username,
-            'role': 'admin' if self.person and self.person.emp_post and self.person.emp_post.role and self.person.emp_post.role.role == 'distribution' else 'student'
+            'role': 'admin' if self.is_admin() else 'student',
+            'is_admin': self.is_admin()
         }
 
 
