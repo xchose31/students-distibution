@@ -26,7 +26,7 @@ def upgrade():
 
     with op.batch_alter_table('subjects', schema=None) as batch_op:
         batch_op.add_column(sa.Column('created_at', sa.TIMESTAMP(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=True))
-        batch_op.create_unique_constraint(None, ['name'])
+        batch_op.create_unique_constraint('uq_person_subject', ['name'])
 
     # ### end Alembic commands ###
 

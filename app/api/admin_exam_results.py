@@ -12,7 +12,7 @@ from ..models.user import ComPerson
 import pandas as pd
 from io import BytesIO
 
-bp = Blueprint('admin_exam_results', __name__, url_prefix='/api/admin/exam-results')
+bp = Blueprint('admin_exam_results', __name__, url_prefix='/admin/exam-results')
 
 
 def admin_required(f):
@@ -34,7 +34,7 @@ def upload_exam_results():
     """
     Загрузка результатов экзаменов из Excel файла
 
-    Все названия предметов автоматически приводятся к lowercase
+    Если результат у ученика по предмету уже существует — это ошибка
     """
 
     if 'file' not in request.files:
@@ -72,11 +72,12 @@ def upload_exam_results():
         'success': 0,
         'failed': 0,
         'failed_students': [],
+        'duplicate_results': [],  # ← Новый список дубликатов
         'subjects_created': [],
         'results_added': 0
     }
 
-    # 🔧 Кэш предметов для оптимизации (название lowercase -> объект)
+    # Кэш предметов для оптимизации
     subject_cache = {}
 
     for index, row in df.iterrows():
@@ -103,8 +104,9 @@ def upload_exam_results():
             })
             continue
 
-        name = fio_parts[0]
-        surname = fio_parts[1] if len(fio_parts) > 1 else ''
+        # 🔧 Исправленный порядок: name = fio_parts[0], surname = fio_parts[1]
+        name = fio_parts[1]
+        surname = fio_parts[0] if len(fio_parts) > 1 else ''
         patro = fio_parts[2] if len(fio_parts) > 2 else ''
 
         # Ищем ученика в базе по ФИО
@@ -124,6 +126,7 @@ def upload_exam_results():
             continue
 
         student_results = 0
+        student_duplicates = []
 
         for subject_col in subject_columns:
             score = row[subject_col]
@@ -138,48 +141,65 @@ def upload_exam_results():
             except (ValueError, TypeError):
                 continue
 
-            # 🔧 Нормализуем название предмета: lowercase + trim
+            # Нормализуем название предмета
             subject_name = str(subject_col).strip().lower()
 
             # Проверяем кэш
             subject = subject_cache.get(subject_name)
 
             if not subject:
-                # Ищем в базе (теперь поиск по lowercase)
                 subject = Subject.query.filter_by(name=subject_name).first()
 
                 if not subject:
-                    # Создаём новый предмет (автоматически сохранится в lowercase)
                     subject = Subject(name=subject_name)
                     db.session.add(subject)
                     stats['subjects_created'].append(subject_name)
                     db.session.flush()
 
-                # Добавляем в кэш
                 subject_cache[subject_name] = subject
 
-            # Проверяем существующий результат
+            # 🔧 ПРОВЕРКА НА ДУБЛИКАТ
             existing_result = ExamResult.query.filter_by(
                 person_id=person.id,
                 subject_id=subject.id
             ).first()
 
             if existing_result:
-                existing_result.result = score_value
-            else:
-                exam_result = ExamResult(
-                    person_id=person.id,
-                    subject_id=subject.id,
-                    result=score_value
-                )
-                db.session.add(exam_result)
-                student_results += 1
+                # 🔴 Результат уже существует — это ошибка
+                student_duplicates.append({
+                    'subject': subject_name,
+                    'existing_score': existing_result.result,
+                    'new_score': score_value
+                })
+                continue  # Пропускаем этот результат, не обновляем
 
-        stats['success'] += 1
+            # Создаём новый результат
+            exam_result = ExamResult(
+                person_id=person.id,
+                subject_id=subject.id,
+                result=score_value
+            )
+            db.session.add(exam_result)
+            student_results += 1
+
+        # Если есть дубликаты — добавляем в статистику ошибок
+        if student_duplicates:
+            stats['duplicate_results'].append({
+                'row': index + 2,
+                'fio': fio_raw,
+                'person_id': person.id,
+                'duplicates': student_duplicates
+            })
+            stats['failed'] += len(student_duplicates)
+
+        if student_results > 0 or not student_duplicates:
+            stats['success'] += 1
+
         stats['results_added'] += student_results
 
     db.session.commit()
 
+    # Формируем ответ
     response = {
         'message': 'Импорт завершён',
         'stats': stats,
@@ -188,16 +208,18 @@ def upload_exam_results():
             'success': stats['success'],
             'failed': stats['failed'],
             'results_added': stats['results_added'],
-            'subjects_created': len(stats['subjects_created'])
+            'subjects_created': len(stats['subjects_created']),
+            'duplicates_found': len(stats['duplicate_results'])
         }
     }
 
-    if stats['failed'] > 0:
-        response['warning'] = f'{stats["failed"]} записей не импортировано'
+    # Добавляем предупреждения если есть ошибки
+    if stats['failed'] > 0 or stats['duplicate_results']:
+        response['warning'] = f'{stats["failed"]} ошибок импортировано'
         response['failed_details'] = stats['failed_students']
+        response['duplicate_details'] = stats['duplicate_results']
 
     return jsonify(response), 200
-
 
 @bp.route('/subjects', methods=['GET'])
 @admin_required

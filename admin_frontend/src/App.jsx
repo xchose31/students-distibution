@@ -4,7 +4,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './components/Login';
 import Layout from './components/Layout';
 import Settings from './components/admin/Settings';
-import DataStub from './components/admin/DataStub';
+import ExamResults from './components/admin/ExamResults';
+import Data from './components/admin/Data';  // ← ← ← ДОБАВИТЬ ЭТУ СТРОКУ
 import ProfileChoice from './components/student/ProfileChoice';
 import ResultsStub from './components/student/ResultsStub';
 import { authService } from './services/auth';
@@ -39,18 +40,17 @@ function App() {
   if (loading) {
     return (
       <div className="loading-spinner">
-        <div className="spinner"></div>
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Загрузка...</span>
+        </div>
       </div>
     );
   }
 
-  return (
+return (
     <BrowserRouter>
       <Routes>
-        <Route
-          path="/login"
-          element={<Login onLoginSuccess={handleLoginSuccess} />}
-        />
+        <Route path="/login" element={<Login onLoginSuccess={handleLoginSuccess} />} />
         <Route
           path="/admin/settings"
           element={
@@ -60,13 +60,21 @@ function App() {
           }
         />
         <Route
-          path="/admin/data"
+          path="/admin/exam-results"
           element={
             <PrivateRoute user={user}>
-              <DataStub />
+              <ExamResults />
             </PrivateRoute>
           }
         />
+        <Route
+          path="/admin/data"
+          element={
+            <PrivateRoute user={user}>
+              <Data />
+            </PrivateRoute>
+          }
+        />  // ← Добавить маршрут
         <Route
           path="/student/profile"
           element={

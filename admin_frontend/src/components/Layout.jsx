@@ -3,6 +3,25 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import '../App.css';
 
+
+const getMenuItems = () => {
+  if (!user) return [];
+
+  if (user.is_admin) {
+    return [
+      { path: '/admin/settings', label: 'Настройки', icon: 'bi-gear-fill' },
+      { path: '/admin/exam-results', label: 'Результаты экзаменов', icon: 'bi-file-earmark-spreadsheet' },
+      { path: '/admin/data', label: 'Данные', icon: 'bi-table' }  // ← Уже должно быть
+    ];
+  } else {
+    return [
+      { path: '/student/profile', label: 'Выбор профиля', icon: 'bi-person-check-fill' },
+      { path: '/student/results', label: 'Результаты', icon: 'bi-file-earmark-text' }
+    ];
+  }
+};
+
+
 function Layout({ children, user, onLogout }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -18,6 +37,7 @@ function Layout({ children, user, onLogout }) {
     if (user.is_admin) {
       return [
         { path: '/admin/settings', label: 'Настройки', icon: 'bi-gear-fill' },
+        { path: '/admin/exam-results', label: 'Результаты экзаменов', icon: 'bi-file-earmark-spreadsheet' },
         { path: '/admin/data', label: 'Данные', icon: 'bi-table' }
       ];
     } else {
@@ -34,7 +54,6 @@ function Layout({ children, user, onLogout }) {
     <div className="d-flex">
       {/* Sidebar */}
       <aside className="sidebar">
-        {/* Header */}
         <div className="sidebar-header">
           <div className="sidebar-brand">
             <i className="bi bi-mortarboard-fill"></i>
@@ -42,7 +61,6 @@ function Layout({ children, user, onLogout }) {
           </div>
         </div>
 
-        {/* Navigation */}
         <nav className="sidebar-nav">
           {menuItems.map((item) => (
             <div key={item.path} className="nav-item">
@@ -57,7 +75,6 @@ function Layout({ children, user, onLogout }) {
           ))}
         </nav>
 
-        {/* Footer with User Info */}
         <div className="sidebar-footer">
           <div className="user-info">
             <div className="user-avatar">
@@ -84,5 +101,6 @@ function Layout({ children, user, onLogout }) {
     </div>
   );
 }
+
 
 export default Layout;
