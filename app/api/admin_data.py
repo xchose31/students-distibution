@@ -129,6 +129,17 @@ def get_all_data():
         # Получаем выбор профилей
         profile_choice = ProfileChoice.query.filter_by(person_id=person.id).first()
 
+        if not profile_choice:
+            profile_choice = ProfileChoice(person_id=person_id)
+            db.session.add(profile_choice)
+
+        if 'first_choice_id' in updates:
+            profile_choice.first_choice_id = updates['first_choice_id']
+        if 'second_choice_id' in updates:
+            profile_choice.second_choice_id = updates['second_choice_id']
+        if 'third_choice_id' in updates:  # ← Добавлено
+            profile_choice.third_choice_id = updates['third_choice_id']
+
         # Строка данных
         row = {
             'person_id': person.id,
@@ -136,12 +147,13 @@ def get_all_data():
             'name': person.name,
             'patro': person.patro,
             'fio': f'{person.name} {person.surname} {person.patro}',
-            'snils': person.snils,
             'first_choice_id': profile_choice.first_choice_id if profile_choice else None,
             'first_choice_name': profile_choice.first_choice.name if profile_choice and profile_choice.first_choice else None,
             'second_choice_id': profile_choice.second_choice_id if profile_choice else None,
             'second_choice_name': profile_choice.second_choice.name if profile_choice and profile_choice.second_choice else None,
-            'results': results_dict,  # {subject_id: score}
+            'third_choice_id': profile_choice.third_choice_id if profile_choice else None,  # ← Добавлено
+            'third_choice_name': profile_choice.third_choice.name if profile_choice and profile_choice.third_choice else None,
+            'results': results_dict,
             'avg_score': sum(results_dict.values()) / len(results_dict) if results_dict else None,
             'total_subjects': len(results_dict)
         }

@@ -104,6 +104,11 @@ class ClassProfile(Base):
         foreign_keys="ProfileChoice.second_choice_id",
         back_populates="second_choice"
     )
+    third_choices = relationship(
+        "ProfileChoice",
+        foreign_keys="ProfileChoice.third_choice_id",
+        back_populates="third_choice"
+    )
 
     def to_dict(self):
         return {
@@ -152,8 +157,8 @@ class ProfileChoice(Base):
     person_id = Column(Integer, ForeignKey('com_persons.id', ondelete='SET NULL'))
     first_choice_id = Column(Integer, ForeignKey('class_profiles.id', ondelete='SET NULL'))
     second_choice_id = Column(Integer, ForeignKey('class_profiles.id', ondelete='SET NULL'))
+    third_choice_id = Column(Integer, ForeignKey('class_profiles.id', ondelete='SET NULL'))  # ← Добавлено
 
-    # 🔧 ИСПРАВЛЕНО: Явно указываем foreign_keys для каждого отношения
     first_choice = relationship(
         "ClassProfile",
         foreign_keys=[first_choice_id],
@@ -164,9 +169,13 @@ class ProfileChoice(Base):
         foreign_keys=[second_choice_id],
         back_populates="second_choices"
     )
+    third_choice = relationship(  # ← Добавлено
+        "ClassProfile",
+        foreign_keys=[third_choice_id],
+        back_populates="third_choices"
+    )
     person = relationship("ComPerson", back_populates="profile_choices")
 
-    # Ограничение: один человек - одна запись выбора
     __table_args__ = (
         UniqueConstraint('person_id', name='uq_person_profile_choice'),
     )
@@ -176,7 +185,8 @@ class ProfileChoice(Base):
             "id": self.id,
             "person_id": self.person_id,
             "first_choice": self.first_choice.to_dict() if self.first_choice else None,
-            "second_choice": self.second_choice.to_dict() if self.second_choice else None
+            "second_choice": self.second_choice.to_dict() if self.second_choice else None,
+            "third_choice": self.third_choice.to_dict() if self.third_choice else None  # ← Добавлено
         }
 
 
