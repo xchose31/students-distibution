@@ -7,6 +7,7 @@ function ProfileChoice() {
   const [selectionOpen, setSelectionOpen] = useState(false);
   const [firstChoice, setFirstChoice] = useState('');
   const [secondChoice, setSecondChoice] = useState('');
+  const [thirdChoice, setThirdChoice] = useState('');
   const [savedChoices, setSavedChoices] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -29,6 +30,7 @@ function ProfileChoice() {
         setSavedChoices(choice);
         setFirstChoice(choice.first_choice?.id || '');
         setSecondChoice(choice.second_choice?.id || '');
+        setThirdChoice(choice.third_choice?.id || '');
       }
     } catch (err) {
       setError('Ошибка загрузки данных');
@@ -47,12 +49,25 @@ function ProfileChoice() {
       return;
     }
 
-    if (!firstChoice || !secondChoice) {
-      setError('Выберите оба профиля');
+    // 🔧 ПРОВЕРКА: Все 3 приоритета обязательны
+    if (!firstChoice) {
+      setError('Выберите первый приоритет');
       return;
     }
 
-    if (firstChoice === secondChoice) {
+    if (!secondChoice) {
+      setError('Выберите второй приоритет');
+      return;
+    }
+
+    if (!thirdChoice) {
+      setError('Выберите третий приоритет');
+      return;
+    }
+
+    // Проверка на дубликаты
+    const choices = [firstChoice, secondChoice, thirdChoice];
+    if (new Set(choices).size !== choices.length) {
       setError('Профили не могут совпадать');
       return;
     }
@@ -60,7 +75,8 @@ function ProfileChoice() {
     try {
       await api.put('/profile-choice', {
         first_choice_id: parseInt(firstChoice),
-        second_choice_id: parseInt(secondChoice)
+        second_choice_id: parseInt(secondChoice),
+        third_choice_id: parseInt(thirdChoice)
       });
       setSuccess('Выбор сохранён!');
       loadData();
@@ -85,13 +101,12 @@ function ProfileChoice() {
     <div>
       <div className="mb-4">
         <h2>Выбор профиля</h2>
-        <p className="text-muted">Выберите профили для поступления в 10 класс</p>
+        <p className="text-muted">Выберите 3 профиля для поступления в 10 класс</p>
       </div>
 
       {error && <div className="alert alert-danger">{error}</div>}
       {success && <div className="alert alert-success">{success}</div>}
 
-      {/* Статус приёма */}
       <div className="card mb-4">
         <div className="card-header">
           <h5 className="mb-0">Статус приёма</h5>
@@ -103,20 +118,28 @@ function ProfileChoice() {
         </div>
       </div>
 
-      {/* Форма выбора */}
       <div className="card mb-4">
         <div className="card-header">
           <h5 className="mb-0">Ваш выбор</h5>
         </div>
         <div className="card-body">
+          <div className="alert alert-info mb-3">
+            <i className="bi bi-info-circle me-2"></i>
+            <strong>Внимание:</strong> Необходимо выбрать ровно 3 профиля. Все приоритеты обязательны для заполнения.
+          </div>
+
           <form onSubmit={handleSubmit}>
             <div className="mb-3">
-              <label className="form-label">Первый приоритет</label>
+              <label className="form-label">
+                <span className="badge bg-primary me-2">1</span>
+                Первый приоритет *
+              </label>
               <select
                 className="form-select"
                 value={firstChoice}
                 onChange={(e) => setFirstChoice(e.target.value)}
                 disabled={!selectionOpen}
+                required
               >
                 <option value="">Выберите профиль</option>
                 {profiles.map((p) => (
@@ -128,12 +151,37 @@ function ProfileChoice() {
             </div>
 
             <div className="mb-3">
-              <label className="form-label">Второй приоритет</label>
+              <label className="form-label">
+                <span className="badge bg-secondary me-2">2</span>
+                Второй приоритет *
+              </label>
               <select
                 className="form-select"
                 value={secondChoice}
                 onChange={(e) => setSecondChoice(e.target.value)}
                 disabled={!selectionOpen}
+                required
+              >
+                <option value="">Выберите профиль</option>
+                {profiles.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="mb-3">
+              <label className="form-label">
+                <span className="badge bg-secondary me-2">3</span>
+                Третий приоритет *
+              </label>
+              <select
+                className="form-select"
+                value={thirdChoice}
+                onChange={(e) => setThirdChoice(e.target.value)}
+                disabled={!selectionOpen}
+                required
               >
                 <option value="">Выберите профиль</option>
                 {profiles.map((p) => (
@@ -155,7 +203,6 @@ function ProfileChoice() {
         </div>
       </div>
 
-      {/* Сохранённый выбор */}
       {savedChoices && (
         <div className="card">
           <div className="card-header">
@@ -164,12 +211,19 @@ function ProfileChoice() {
           <div className="card-body">
             <ul className="list-group list-group-flush">
               <li className="list-group-item">
+                <span className="badge bg-primary me-2">1</span>
                 <strong>Первый приоритет:</strong>{' '}
                 {savedChoices.first_choice?.name || 'Не выбран'}
               </li>
               <li className="list-group-item">
+                <span className="badge bg-secondary me-2">2</span>
                 <strong>Второй приоритет:</strong>{' '}
                 {savedChoices.second_choice?.name || 'Не выбран'}
+              </li>
+              <li className="list-group-item">
+                <span className="badge bg-secondary me-2">3</span>
+                <strong>Третий приоритет:</strong>{' '}
+                {savedChoices.third_choice?.name || 'Не выбран'}
               </li>
             </ul>
           </div>

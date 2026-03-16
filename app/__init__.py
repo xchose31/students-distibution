@@ -2,6 +2,7 @@ import os
 from flask import Flask
 from app.config import config
 from app.extensions import init_extensions
+from flask_cors import CORS
 
 
 def create_app(config_name=None):
@@ -10,6 +11,7 @@ def create_app(config_name=None):
 
     app = Flask(__name__)
     app.config.from_object(config[config_name])
+    CORS(app)
 
     # 1. Инициализация расширений (db, login_manager)
     init_extensions(app)

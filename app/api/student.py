@@ -1,8 +1,11 @@
+# app/api/student.py
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from ..models.user import User, SystemSetting, ClassProfile, ProfileChoice
+from ..models.user import User, ComPerson
+from ..models.user import ClassProfile
+from ..models.user import SystemSetting
+from ..models.user import ProfileChoice
 from ..extensions import db
-
 
 bp = Blueprint('student', __name__)
 
@@ -29,20 +32,31 @@ def crud_profile_choice():
 
         data = request.get_json()
 
-        if not data.get('first_choice_id') or not data.get('second_choice_id'):
-            return jsonify({"error": "Выберите оба профиля"}), 400
+        # 🔧 Получаем все 3 приоритета
+        first_choice_id = data.get('first_choice_id')
+        second_choice_id = data.get('second_choice_id')
+        third_choice_id = data.get('third_choice_id')
 
-        if data['first_choice_id'] == data['second_choice_id']:
+        # Первый приоритет обязателен
+        if not first_choice_id:
+            return jsonify({"error": "Выберите первый приоритет"}), 400
+
+        # Проверка на дубликаты
+        choices = [first_choice_id, second_choice_id, third_choice_id]
+        choices = [c for c in choices if c]  # Убираем None
+        if len(choices) != len(set(choices)):
             return jsonify({"error": "Профили не могут совпадать"}), 400
 
         if profile_choice:
-            profile_choice.first_choice_id = data['first_choice_id']
-            profile_choice.second_choice_id = data['second_choice_id']
+            profile_choice.first_choice_id = first_choice_id
+            profile_choice.second_choice_id = second_choice_id
+            profile_choice.third_choice_id = third_choice_id
         else:
             profile_choice = ProfileChoice(
                 person_id=person.id,
-                first_choice_id=data['first_choice_id'],
-                second_choice_id=data['second_choice_id']
+                first_choice_id=first_choice_id,
+                second_choice_id=second_choice_id,
+                third_choice_id=third_choice_id
             )
             db.session.add(profile_choice)
 
