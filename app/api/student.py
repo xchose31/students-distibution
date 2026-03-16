@@ -1,7 +1,7 @@
 # app/api/student.py
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from ..models.user import User, ComPerson
+from ..models.user import User, ComPerson, ExamResult
 from ..models.user import ClassProfile
 from ..models.user import SystemSetting
 from ..models.user import ProfileChoice
@@ -76,3 +76,60 @@ def get_profiles():
         "selection_open": selection_open,
         "profiles": [p.to_dict() for p in profiles]
     }), 200
+
+
+# app/api/student.py
+# app/api/student.py
+
+@bp.route('/profile', methods=['GET'])
+@jwt_required()
+def get_student_profile():
+    """
+    Получить полную информацию об ученике
+    """
+    current_user_id = get_jwt_identity()
+    user = User.query.get_or_404(int(current_user_id))
+    person = user.person
+
+    print(f"📥 Запрос профиля для пользователя {user.id}, person_id={person.id}")
+
+    # Результаты экзаменов
+    exam_results = ExamResult.query.filter_by(person_id=person.id).all()
+    results = [
+        {
+            'subject_id': r.subject.id,
+            'subject_name': r.subject.name,
+            'result': r.result
+        }
+        for r in exam_results
+    ]
+
+    print(f"📊 Найдено результатов: {len(results)}")
+
+    # Выбор профилей
+    profile_choice = ProfileChoice.query.filter_by(person_id=person.id).first()
+
+    response_data = {
+        'person': {
+            'id': person.id,
+            'fio': f'{person.surname} {person.name} {person.patro}',
+            'surname': person.surname,
+            'name': person.name,
+            'patro': person.patro
+        },
+        'enrollment': {
+            'class': person.enrolled_class,
+            'profile': person.enrolled_profile
+        },
+        'profile_choices': {
+            'first_choice': profile_choice.first_choice.name if profile_choice and profile_choice.first_choice else None,
+            'second_choice': profile_choice.second_choice.name if profile_choice and profile_choice.second_choice else None,
+            'third_choice': profile_choice.third_choice.name if profile_choice and profile_choice.third_choice else None
+        } if profile_choice else None,
+        'exam_results': results,
+        'avg_score': sum(r['result'] for r in results) / len(results) if results else None
+    }
+
+    print(f"✅ Отправляем ответ: {response_data}")
+
+    return jsonify(response_data), 200

@@ -55,7 +55,6 @@ function ExamResults() {
       setResult(response.data);
       setSuccess('Импорт завершён успешно!');
 
-      // Очистить поле файла
       setFile(null);
       document.getElementById('fileInput').value = '';
     } catch (err) {
@@ -66,7 +65,6 @@ function ExamResults() {
   };
 
   const handleDownloadTemplate = () => {
-    // Создаём пример файла для скачивания (информация)
     const template = `Пример формата файла Excel:
 
 Столбцы:
@@ -75,16 +73,19 @@ function ExamResults() {
 - Русский язык (оценка, можно пустое)
 - Физика (оценка, можно пустое)
 - и т.д.
+- Класс зачисления (например: 10-Г, 10-Ф) - необязательно
+- Профиль зачисления (например: Физико-технологический) - необязательно
 
 Пример:
-ФИО | Математика | Русский язык | Физика
-Иван Иванов Иванович | 85 | 90 | 78
-Петр Петров Петрович | 92 | 88 |
+ФИО | Математика | Русский язык | Физика | Класс зачисления | Профиль зачисления
+Иван Иванов Иванович | 85 | 90 | 78 | 10-Г | Физико-математический
+Петр Петров Петрович | 92 | 88 | 95 | 10-Ф | Инженерный
 
 Важно:
 - ФИО должно точно совпадать с данными в базе
 - Пустые ячейки пропускаются
-- Дополнительные столбцы игнорируются`;
+- Дополнительные столбцы игнорируются
+- Последние 2 столбца автоматически определяются как класс и профиль зачисления`;
 
     alert(template);
   };
@@ -110,11 +111,20 @@ function ExamResults() {
         <div className="card-body">
           <ul className="mb-0">
             <li>Формат: <strong>.xlsx</strong> или <strong>.xls</strong></li>
-            <li>Обязательный столбец: <strong>ФИО</strong> (формат: Имя Фамилия Отчество)</li>
+            <li>Обязательный столбец: <strong>ФИО</strong> (формат: Фамилия Имя Отчество)</li>
             <li>Столбцы с предметами: любые названия (например: "Математика", "Русский язык")</li>
             <li>Пустые ячейки с оценками пропускаются</li>
             <li>Дополнительные столбцы игнорируются</li>
             <li>ФИО должно точно совпадать с данными в базе</li>
+            <li className="mt-2">
+              <strong className="text-primary">Класс и профиль зачисления:</strong>
+              <ul className="mt-1">
+                <li>Добавьте столбцы "Класс зачисления" и "Профиль зачисления"</li>
+                <li>Или используйте последние 2 столбца таблицы</li>
+                <li>Пример: "10-Г", "Физико-технологический"</li>
+                <li>Эти данные сохранятся в личном кабинете ученика</li>
+              </ul>
+            </li>
           </ul>
           <button
             className="btn btn-outline-primary btn-sm mt-3"
@@ -217,8 +227,8 @@ function ExamResults() {
                 </div>
                 <div className="col-md-2">
                   <div className="text-center">
-                    <h3 className="text-success">{result.summary.subjects_created}</h3>
-                    <p className="text-muted">Предметов</p>
+                    <h3 className="text-success">{result.summary.enrollment_updated || 0}</h3>
+                    <p className="text-muted">Зачислено</p>
                   </div>
                 </div>
               </div>
@@ -280,9 +290,30 @@ function ExamResults() {
             </div>
           )}
 
-          {/* Ошибки (ученики не найдены и т.д.) */}
+          {/* Обновления зачисления */}
+          {result.stats.enrollment_updated > 0 && (
+            <div className="card mb-4">
+              <div className="card-header bg-success text-white">
+                <h5 className="mb-0">
+                  <i className="bi bi-mortarboard-fill me-2"></i>
+                  Зачисление ({result.stats.enrollment_updated} учеников)
+                </h5>
+              </div>
+              <div className="card-body">
+                <div className="alert alert-success mb-3">
+                  <i className="bi bi-check-circle me-2"></i>
+                  Для {result.stats.enrollment_updated} учеников обновлены данные о зачислении (класс и профиль)
+                </div>
+                <p className="text-muted">
+                  Эти данные будут отображаться в личных кабинетах учеников и в общей таблице данных.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Ошибки */}
           {result.failed_details && result.failed_details.length > 0 && (
-            <div className="card">
+            <div className="card mb-4">
               <div className="card-header bg-danger text-white">
                 <h5 className="mb-0">
                   <i className="bi bi-exclamation-triangle me-2"></i>
@@ -318,8 +349,8 @@ function ExamResults() {
 
           {/* Созданные предметы */}
           {result.stats.subjects_created && result.stats.subjects_created.length > 0 && (
-            <div className="card mt-4">
-              <div className="card-header bg-success text-white">
+            <div className="card">
+              <div className="card-header bg-info text-white">
                 <h5 className="mb-0">
                   <i className="bi bi-plus-circle me-2"></i>
                   Новые предметы ({result.stats.subjects_created.length})
@@ -328,7 +359,7 @@ function ExamResults() {
               <div className="card-body">
                 <div className="d-flex flex-wrap gap-2">
                   {result.stats.subjects_created.map((subject, index) => (
-                    <span key={index} className="badge bg-success">
+                    <span key={index} className="badge bg-info text-dark">
                       {subject}
                     </span>
                   ))}

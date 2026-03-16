@@ -34,7 +34,9 @@ def upload_exam_results():
     """
     Загрузка результатов экзаменов из Excel файла
 
-    Если результат у ученика по предмету уже существует — это ошибка
+    Последние 2 столбца (если есть):
+    - Предпоследний: Класс зачисления (например, "10-Г")
+    - Последний: Профиль зачисления (например, "Физико-технологический")
     """
 
     if 'file' not in request.files:
@@ -53,18 +55,63 @@ def upload_exam_results():
     except Exception as e:
         return jsonify({"error": f"Ошибка чтения файла: {str(e)}"}), 400
 
+    # 🔧 ОТЛАДКА: Выводим названия всех столбцов
+    print("📋 Все столбцы в файле:", list(df.columns))
+
     # Проверяем наличие столбца ФИО
     fio_column = None
     for col in df.columns:
-        if 'фио' in str(col).lower() or 'fio' in str(col).lower():
+        col_lower = str(col).lower()
+        if 'фио' in col_lower or 'fio' in col_lower or 'фамилия' in col_lower:
             fio_column = col
             break
 
     if fio_column is None:
         return jsonify({"error": "В файле не найден столбец 'ФИО'"}), 400
 
-    # Получаем список столбцов-предметов (все кроме ФИО)
-    subject_columns = [col for col in df.columns if col != fio_column]
+    print(f"✅ Столбец ФИО: {fio_column}")
+
+    # Получаем все столбцы кроме ФИО
+    all_columns = [col for col in df.columns if col != fio_column]
+    print(f"📊 Столбцы данных: {all_columns}")
+
+    # 🔧 ОПРЕДЕЛЯЕМ СТОЛБЦЫ ЗАЧИСЛЕНИЯ
+    enrolled_class_col = None
+    enrolled_profile_col = None
+
+    # 🔍 Поиск по названиям (приоритет 1)
+    for col in all_columns:
+        col_lower = str(col).lower().strip()
+
+        # 🔴 Класс зачисления - ТОЛЬКО если содержит "класс"
+        if enrolled_class_col is None and 'класс' in col_lower:
+            enrolled_class_col = col
+            print(f"✅ Найден столбец КЛАССА: '{col}'")
+
+        # 🔵 Профиль зачисления - ТОЛЬКО если содержит "профиль"
+        if enrolled_profile_col is None and 'профиль' in col_lower:
+            enrolled_profile_col = col
+            print(f"✅ Найден столбец ПРОФИЛЯ: '{col}'")
+
+    # 🔧 Если не нашли по названиям — используем последние 2 столбца (fallback)
+    if len(all_columns) >= 2:
+        if not enrolled_class_col:
+            enrolled_class_col = all_columns[-2]
+            print(f"⚠️ Класс зачисления (по позиции - предпоследний): '{enrolled_class_col}'")
+
+        if not enrolled_profile_col:
+            enrolled_profile_col = all_columns[-1]
+            print(f"⚠️ Профиль зачисления (по позиции - последний): '{enrolled_profile_col}'")
+
+    # Столбцы-предметы (все кроме ФИО и столбцов зачисления)
+    subject_columns = [
+        col for col in all_columns
+        if col != enrolled_class_col and col != enrolled_profile_col
+    ]
+
+    print(f"📚 Столбцы-предметы: {subject_columns}")
+    print(f"🏫 Класс зачисления: '{enrolled_class_col}'")
+    print(f"🎓 Профиль зачисления: '{enrolled_profile_col}'")
 
     # Статистика импорта
     stats = {
@@ -72,12 +119,13 @@ def upload_exam_results():
         'success': 0,
         'failed': 0,
         'failed_students': [],
-        'duplicate_results': [],  # ← Новый список дубликатов
+        'duplicate_results': [],
         'subjects_created': [],
-        'results_added': 0
+        'results_added': 0,
+        'enrollment_updated': 0
     }
 
-    # Кэш предметов для оптимизации
+    # Кэш предметов
     subject_cache = {}
 
     for index, row in df.iterrows():
@@ -104,7 +152,6 @@ def upload_exam_results():
             })
             continue
 
-        # 🔧 Исправленный порядок: name = fio_parts[0], surname = fio_parts[1]
         name = fio_parts[1]
         surname = fio_parts[0] if len(fio_parts) > 1 else ''
         patro = fio_parts[2] if len(fio_parts) > 2 else ''
@@ -127,24 +174,47 @@ def upload_exam_results():
 
         student_results = 0
         student_duplicates = []
+        enrollment_updated = False
 
+        # 🔧 Обработка класса и профиля зачисления
+        enrolled_class = None
+        enrolled_profile = None
+
+        if enrolled_class_col:
+            class_value = row[enrolled_class_col]
+            print(f"  🔍 Значение класса из столбца '{enrolled_class_col}': {class_value}")
+            if pd.notna(class_value) and str(class_value).strip() and str(class_value).strip() != 'nan':
+                enrolled_class = str(class_value).strip()
+
+        if enrolled_profile_col:
+            profile_value = row[enrolled_profile_col]
+            print(f"  🔍 Значение профиля из столбца '{enrolled_profile_col}': {profile_value}")
+            if pd.notna(profile_value) and str(profile_value).strip() and str(profile_value).strip() != 'nan':
+                enrolled_profile = str(profile_value).strip()
+
+        # Обновляем поля зачисления у ученика
+        if enrolled_class or enrolled_profile:
+            if enrolled_class:
+                person.enrolled_class = enrolled_class
+                print(f"  ✅ person.enrolled_class = {enrolled_class}")
+            if enrolled_profile:
+                person.enrolled_profile = enrolled_profile
+                print(f"  ✅ person.enrolled_profile = {enrolled_profile}")
+            enrollment_updated = True
+
+        # Обработка результатов экзаменов
         for subject_col in subject_columns:
             score = row[subject_col]
 
-            # Пропускаем пустые значения
-            if pd.isna(score) or score == '' or str(score).strip() == '':
+            if pd.isna(score) or score == '' or str(score).strip() == '' or str(score).strip() == 'nan':
                 continue
 
-            # Пытаемся преобразовать в число
             try:
                 score_value = int(float(score))
             except (ValueError, TypeError):
                 continue
 
-            # Нормализуем название предмета
             subject_name = str(subject_col).strip().lower()
-
-            # Проверяем кэш
             subject = subject_cache.get(subject_name)
 
             if not subject:
@@ -158,20 +228,19 @@ def upload_exam_results():
 
                 subject_cache[subject_name] = subject
 
-            # 🔧 ПРОВЕРКА НА ДУБЛИКАТ
+            # Проверка на дубликат
             existing_result = ExamResult.query.filter_by(
                 person_id=person.id,
                 subject_id=subject.id
             ).first()
 
             if existing_result:
-                # 🔴 Результат уже существует — это ошибка
                 student_duplicates.append({
                     'subject': subject_name,
                     'existing_score': existing_result.result,
                     'new_score': score_value
                 })
-                continue  # Пропускаем этот результат, не обновляем
+                continue
 
             # Создаём новый результат
             exam_result = ExamResult(
@@ -182,7 +251,7 @@ def upload_exam_results():
             db.session.add(exam_result)
             student_results += 1
 
-        # Если есть дубликаты — добавляем в статистику ошибок
+        # Статистика по дубликатам
         if student_duplicates:
             stats['duplicate_results'].append({
                 'row': index + 2,
@@ -192,12 +261,17 @@ def upload_exam_results():
             })
             stats['failed'] += len(student_duplicates)
 
-        if student_results > 0 or not student_duplicates:
+        if student_results > 0 or enrollment_updated:
             stats['success'] += 1
+
+        if enrollment_updated:
+            stats['enrollment_updated'] += 1
 
         stats['results_added'] += student_results
 
     db.session.commit()
+
+    print(f"🎉 Импорт завершён: {stats['success']} успешно, {stats['enrollment_updated']} зачислений")
 
     # Формируем ответ
     response = {
@@ -209,11 +283,11 @@ def upload_exam_results():
             'failed': stats['failed'],
             'results_added': stats['results_added'],
             'subjects_created': len(stats['subjects_created']),
-            'duplicates_found': len(stats['duplicate_results'])
+            'duplicates_found': len(stats['duplicate_results']),
+            'enrollment_updated': stats['enrollment_updated']
         }
     }
 
-    # Добавляем предупреждения если есть ошибки
     if stats['failed'] > 0 or stats['duplicate_results']:
         response['warning'] = f'{stats["failed"]} ошибок импортировано'
         response['failed_details'] = stats['failed_students']

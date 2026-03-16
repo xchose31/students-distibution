@@ -1,4 +1,5 @@
 // admin_frontend/src/App.jsx
+import Results from './components/student/Results';
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './components/Login';
@@ -50,6 +51,14 @@ function App() {
 return (
     <BrowserRouter>
       <Routes>
+          <Route
+  path="/student/results"
+  element={
+    <PrivateRoute user={user}>
+      <Results />  // ← Компонент существует?
+    </PrivateRoute>
+  }
+/>
         <Route path="/login" element={<Login onLoginSuccess={handleLoginSuccess} />} />
         <Route
           path="/admin/settings"

@@ -7,7 +7,7 @@ from ..models.user import User, ComPerson
 from ..models.user import Subject, ExamResult, EmpPost, EmpPostRoles
 from ..models.user import ClassProfile
 from ..models.user import ProfileChoice
-from ..models.user import SystemSetting
+from sqlalchemy import func
 
 bp = Blueprint('admin_data', __name__, url_prefix='/admin/data')
 
@@ -30,17 +30,6 @@ def admin_required(f):
 def get_all_data():
     """
     Получить все данные для таблицы в плоском формате
-
-    Каждая строка = один ученик
-    Колонки: ФИО + все предметы + выбор профилей
-
-    Query params:
-    - search: поиск по ФИО
-    - profile: фильтр по профилю (id)
-    - subject: фильтр по предмету (id)
-    - min_score: минимальный балл
-    - sort_by: сортировка (surname, name, avg_score)
-    - sort_order: asc/desc
     """
 
     # Параметры запроса
@@ -51,11 +40,12 @@ def get_all_data():
     sort_by = request.args.get('sort_by', 'surname')
     sort_order = request.args.get('sort_order', 'asc')
 
-    # Базовый запрос: все ученики
+    # Базовый запрос: все ученики (исключая администраторов)
     query = ComPerson.query.join(User, User.pers_id == ComPerson.id, isouter=True)
 
+    # ИСКЛЮЧАЕМ АДМИНИСТРАТОРОВ
     query = query.filter(
-        ~ComPerson.emp_post.has(  # NOT EXISTS
+        ~ComPerson.emp_post.has(
             EmpPost.role.has(
                 EmpPostRoles.role == 'distribution'
             )
@@ -73,13 +63,14 @@ def get_all_data():
             )
         )
 
-    # Фильтр по профилю (первый или второй приоритет)
+    # Фильтр по профилю (первый, второй или третий приоритет)
     if profile_filter:
         query = query.join(ProfileChoice, ProfileChoice.person_id == ComPerson.id, isouter=True)
         query = query.filter(
             db.or_(
                 ProfileChoice.first_choice_id == profile_filter,
-                ProfileChoice.second_choice_id == profile_filter
+                ProfileChoice.second_choice_id == profile_filter,
+                ProfileChoice.third_choice_id == profile_filter
             )
         )
 
@@ -99,8 +90,6 @@ def get_all_data():
     elif sort_by == 'name':
         query = query.order_by(ComPerson.name.asc() if sort_order == 'asc' else ComPerson.name.desc())
     elif sort_by == 'avg_score':
-        # Сложная сортировка по среднему баллу
-        from sqlalchemy import func
         avg_subquery = db.session.query(
             ExamResult.person_id,
             func.avg(ExamResult.result).label('avg_score')
@@ -124,41 +113,30 @@ def get_all_data():
     for person in persons:
         # Получаем результаты экзаменов
         exam_results = ExamResult.query.filter_by(person_id=person.id).all()
-        results_dict = {r.subject_id: r.result for r in exam_results}
 
-        # Получаем выбор профилей
+        # 🔧 ПОЛУЧАЕМ ВЫБОР ПРОФИЛЕЙ (ОБЯЗАТЕЛЬНО!)
         profile_choice = ProfileChoice.query.filter_by(person_id=person.id).first()
 
-        if not profile_choice:
-            profile_choice = ProfileChoice(person_id=person_id)
-            db.session.add(profile_choice)
-
-        if 'first_choice_id' in updates:
-            profile_choice.first_choice_id = updates['first_choice_id']
-        if 'second_choice_id' in updates:
-            profile_choice.second_choice_id = updates['second_choice_id']
-        if 'third_choice_id' in updates:  # ← Добавлено
-            profile_choice.third_choice_id = updates['third_choice_id']
-
-        # Строка данных
+        # ПЛОСКАЯ СТРУКТУРА
         row = {
             'person_id': person.id,
             'surname': person.surname,
             'name': person.name,
             'patro': person.patro,
             'fio': f'{person.name} {person.surname} {person.patro}',
-            'snils': person.snils,
+            'enrolled_class': person.enrolled_class,
+            'enrolled_profile': person.enrolled_profile,
             'first_choice_id': profile_choice.first_choice_id if profile_choice else None,
             'first_choice_name': profile_choice.first_choice.name if profile_choice and profile_choice.first_choice else None,
             'second_choice_id': profile_choice.second_choice_id if profile_choice else None,
             'second_choice_name': profile_choice.second_choice.name if profile_choice and profile_choice.second_choice else None,
-            'third_choice_id': profile_choice.third_choice_id if profile_choice else None,  # ← Добавлено
+            'third_choice_id': profile_choice.third_choice_id if profile_choice else None,
             'third_choice_name': profile_choice.third_choice.name if profile_choice and profile_choice.third_choice else None,
-            'results': results_dict,
-            'results': results_dict,  # {subject_id: score}
-            'avg_score': sum(results_dict.values()) / len(results_dict) if results_dict else None,
-            'total_subjects': len(results_dict)
         }
+
+        # Добавляем результаты как плоские поля
+        for result in exam_results:
+            row[f'result_{result.subject_id}'] = result.result
 
         rows.append(row)
 
@@ -178,27 +156,17 @@ def get_all_data():
     }), 200
 
 
+# app/api/admin_data.py
+
 @bp.route('/update', methods=['PUT'])
 @admin_required
 def update_data():
     """
     Обновить данные ученика
-
-    Request body:
-    {
-        "person_id": 123,
-        "updates": {
-            "surname": "Новая Фамилия",
-            "results": {
-                "1": 95,  # subject_id: score
-                "2": 88
-            },
-            "first_choice_id": 5,
-            "second_choice_id": 6
-        }
-    }
     """
     data = request.get_json()
+
+    print(f"📥 Получен запрос: {data}")  # ← Лог для отладки
 
     if not data or 'person_id' not in data or 'updates' not in data:
         return jsonify({"error": "Неверный формат данных"}), 400
@@ -211,6 +179,8 @@ def update_data():
     if not person:
         return jsonify({"error": "Ученик не найден"}), 404
 
+    print(f"✅ Найдён ученик: {person.name} {person.surname}")
+
     # Обновляем личные данные
     if 'surname' in updates:
         person.surname = updates['surname']
@@ -221,12 +191,20 @@ def update_data():
     if 'snils' in updates:
         person.snils = updates['snils']
 
+    # 🔧 Обновляем поля зачисления (ОБЯЗАТЕЛЬНО!)
+    if 'enrolled_class' in updates:
+        person.enrolled_class = updates['enrolled_class']
+        print(f"📝 Класс зачисления: {updates['enrolled_class']}")
+
+    if 'enrolled_profile' in updates:
+        person.enrolled_profile = updates['enrolled_profile']
+        print(f"📝 Профиль зачисления: {updates['enrolled_profile']}")
+
     # Обновляем результаты экзаменов
     if 'results' in updates:
         for subject_id, score in updates['results'].items():
             subject_id = int(subject_id)
 
-            # Пропускаем пустые значения (удаление оценки)
             if score is None or score == '':
                 existing = ExamResult.query.filter_by(
                     person_id=person_id,
@@ -236,7 +214,6 @@ def update_data():
                     db.session.delete(existing)
                 continue
 
-            # Проверяем существующий результат
             existing = ExamResult.query.filter_by(
                 person_id=person_id,
                 subject_id=subject_id
@@ -245,7 +222,6 @@ def update_data():
             if existing:
                 existing.result = int(score)
             else:
-                # Создаём новый
                 exam_result = ExamResult(
                     person_id=person_id,
                     subject_id=subject_id,
@@ -254,7 +230,7 @@ def update_data():
                 db.session.add(exam_result)
 
     # Обновляем выбор профилей
-    if 'first_choice_id' in updates or 'second_choice_id' in updates:
+    if 'first_choice_id' in updates or 'second_choice_id' in updates or 'third_choice_id' in updates:
         profile_choice = ProfileChoice.query.filter_by(person_id=person_id).first()
 
         if not profile_choice:
@@ -265,8 +241,11 @@ def update_data():
             profile_choice.first_choice_id = updates['first_choice_id']
         if 'second_choice_id' in updates:
             profile_choice.second_choice_id = updates['second_choice_id']
+        if 'third_choice_id' in updates:
+            profile_choice.third_choice_id = updates['third_choice_id']
 
     db.session.commit()
+    print(f"✅ Данные сохранены")
 
     # Возвращаем обновлённые данные
     exam_results = ExamResult.query.filter_by(person_id=person_id).all()
@@ -280,10 +259,14 @@ def update_data():
         'name': person.name,
         'patro': person.patro,
         'snils': person.snils,
+        'enrolled_class': person.enrolled_class,
+        'enrolled_profile': person.enrolled_profile,
         'first_choice_id': profile_choice.first_choice_id if profile_choice else None,
         'first_choice_name': profile_choice.first_choice.name if profile_choice and profile_choice.first_choice else None,
         'second_choice_id': profile_choice.second_choice_id if profile_choice else None,
         'second_choice_name': profile_choice.second_choice.name if profile_choice and profile_choice.second_choice else None,
+        'third_choice_id': profile_choice.third_choice_id if profile_choice else None,
+        'third_choice_name': profile_choice.third_choice.name if profile_choice and profile_choice.third_choice else None,
         'results': results_dict,
         'message': 'Данные обновлены'
     }), 200

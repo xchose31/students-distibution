@@ -1,7 +1,10 @@
 // admin_frontend/src/components/admin/Data.jsx
+
+// 🔧 Регистрация модулей AG Grid
 import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
 ModuleRegistry.registerModules([AllCommunityModule]);
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
@@ -14,18 +17,16 @@ function Data() {
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
   const [filters, setFilters] = useState({
     search: '',
     profile: '',
     subject: '',
-    min_score: '',
-    sort_by: 'surname',
-    sort_order: 'asc'
+    min_score: ''
   });
-  const [gridApi, setGridApi] = useState(null);
 
   // Загрузка данных
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     setError('');
 
@@ -35,45 +36,24 @@ function Data() {
       if (filters.profile) params.append('profile', filters.profile);
       if (filters.subject) params.append('subject', filters.subject);
       if (filters.min_score) params.append('min_score', filters.min_score);
-      if (filters.sort_by) params.append('sort_by', filters.sort_by);
-      if (filters.sort_order) params.append('sort_order', filters.sort_order);
-
-      console.log('📡 Запрос:', `/admin/data?${params.toString()}`);
 
       const response = await api.get(`/admin/data?${params.toString()}`);
 
-      console.log('📦 Ответ API:', response.data);
-      console.log('📊 Данные:', response.data.data);
-      console.log('📚 Предметы:', response.data.subjects);
-      console.log('📁 Профили:', response.data.profiles);
+      setRowData(response.data?.data || []);
+      setSubjects(response.data?.subjects || []);
+      setProfiles(response.data?.profiles || []);
 
-      const data = response.data.data || [];
-      const subjectsData = response.data.subjects || [];
-      const profilesData = response.data.profiles || [];
-
-      setRowData(data);
-      setSubjects(subjectsData);
-      setProfiles(profilesData);
-
-      console.log('✅ rowData установлено:', data.length, 'записей');
     } catch (err) {
-      console.error('❌ Ошибка загрузки:', err);
-      setError(err.response?.data?.error || 'Ошибка загрузки данных');
+      console.error('Ошибка:', err);
+      setError(err.response?.data?.error || 'Ошибка загрузки');
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
 
-  // Построение колонок таблицы
+  // Построение колонок
   useEffect(() => {
-    console.log('🔧 useEffect для колонок');
-    console.log('Subjects:', subjects);
-    console.log('Profiles:', profiles);
-
-    if (subjects.length === 0 || profiles.length === 0) {
-      console.log('⚠️ Subjects или Profiles пусты, пропускаем построение колонок');
-      return;
-    }
+    if (!subjects?.length || !profiles?.length) return;
 
     const cols = [
       {
@@ -81,89 +61,114 @@ function Data() {
         field: 'fio',
         pinned: 'left',
         width: 250,
-        filter: 'agTextColumnFilter',
+        filter: true,
         editable: false,
         cellStyle: { fontWeight: '600' }
       },
       {
+        headerName: 'Класс зачисления',
+        field: 'enrolled_class',
+        width: 130,
+        filter: true,
+        editable: true,
+        cellEditor: 'agTextCellEditor',
+        cellStyle: { backgroundColor: '#e8f5e9' }
+      },
+      {
+        headerName: 'Профиль зачисления',
+        field: 'enrolled_profile',
+        width: 200,
+        filter: true,
+        editable: true,
+        cellEditor: 'agTextCellEditor',
+        cellStyle: { backgroundColor: '#e3f2fd' }
+      },
+      {
         headerName: '1 приоритет',
         field: 'first_choice_name',
-        width: 200,
-        filter: 'agTextColumnFilter',
+        width: 180,
+        filter: true,
         editable: true,
         cellEditor: 'agSelectCellEditor',
         cellEditorParams: {
-          values: ['', ...profiles.map(p => p.name)]
+          values: ['', ...profiles.map(p => p.name).filter(Boolean)]
         }
       },
       {
         headerName: '2 приоритет',
         field: 'second_choice_name',
-        width: 200,
-        filter: 'agTextColumnFilter',
+        width: 180,
+        filter: true,
         editable: true,
         cellEditor: 'agSelectCellEditor',
         cellEditorParams: {
-          values: ['', ...profiles.map(p => p.name)]
+          values: ['', ...profiles.map(p => p.name).filter(Boolean)]
         }
       },
+      {
+        headerName: '3 приоритет',
+        field: 'third_choice_name',
+        width: 180,
+        filter: true,
+        editable: true,
+        cellEditor: 'agSelectCellEditor',
+        cellEditorParams: {
+          values: ['', ...profiles.map(p => p.name).filter(Boolean)]
+        }
+      }
     ];
 
-    // Добавляем колонки предметов
+    // Добавляем предметы
     subjects.forEach(subject => {
-      console.log('➕ Добавляем предмет:', subject);
+      if (!subject?.id) return;
       cols.push({
         headerName: subject.name,
         field: `result_${subject.id}`,
-        width: 110,
-        filter: 'agNumberColumnFilter',
+        width: 100,
+        filter: true,
         editable: true,
-        cellEditor: 'agNumberCellEditor',
-        cellEditorParams: {
-          min: 0,
-          max: 100,
-          step: 1
-        },
-        valueGetter: (params) => {
-          const score = params.data.results ? params.data.results[subject.id] : null;
-          console.log('valueGetter:', subject.name, 'person_id:', params.data.person_id, 'score:', score);
-          return score;
-        }
+        cellEditor: 'agNumberCellEditor'
       });
     });
 
-    console.log('📋 Итоговые колонки:', cols.length);
     setColumnDefs(cols);
   }, [subjects, profiles]);
 
   // Загрузка при монтировании
   useEffect(() => {
-    console.log('🚀 componentDidMount');
     loadData();
-  }, []);
+  }, [loadData]);
 
-  // Обработчики событий AG Grid
+  // Обработка изменений ячеек
   const onCellValueChanged = async (event) => {
-    console.log('✏️ Изменение ячейки:', event);
-    const personId = event.data.person_id;
-    const field = event.colDef.field;
+    const personId = event.data?.person_id;
+    const field = event.colDef?.field;
     const newValue = event.newValue;
+    const oldValue = event.oldValue;
+
+    if (!personId || !field) return;
+    if (newValue === oldValue) return;
 
     let updates = {};
 
-    if (field === 'snils') {
-      updates = { snils: newValue };
+    if (field === 'enrolled_class') {
+      updates = { enrolled_class: newValue };
+    } else if (field === 'enrolled_profile') {
+      updates = { enrolled_profile: newValue };
     } else if (field === 'first_choice_name') {
       const profile = profiles.find(p => p.name === newValue);
-      updates = { first_choice_id: profile ? profile.id : null };
+      updates = { first_choice_id: profile?.id ?? null };
     } else if (field === 'second_choice_name') {
       const profile = profiles.find(p => p.name === newValue);
-      updates = { second_choice_id: profile ? profile.id : null };
+      updates = { second_choice_id: profile?.id ?? null };
+    } else if (field === 'third_choice_name') {
+      const profile = profiles.find(p => p.name === newValue);
+      updates = { third_choice_id: profile?.id ?? null };
     } else if (field.startsWith('result_')) {
       const subjectId = field.replace('result_', '');
       updates = {
         results: {
-          [subjectId]: newValue === '' ? null : parseInt(newValue)
+          [subjectId]: newValue === '' || newValue === null ? null : parseInt(newValue)
         }
       };
     }
@@ -174,8 +179,25 @@ function Data() {
           person_id: personId,
           updates
         });
-        await loadData();
+
+        // Обновляем локально для мгновенного отображения
+        setRowData(prevData =>
+          prevData.map(person => {
+            if (person.person_id === personId) {
+              if (field.startsWith('result_')) {
+                return { ...person, [field]: newValue };
+              }
+              if (field === 'enrolled_class' || field === 'enrolled_profile') {
+                return { ...person, [field]: newValue };
+              }
+              return { ...person, ...updates };
+            }
+            return person;
+          })
+        );
+
       } catch (err) {
+        console.error('Ошибка сохранения:', err);
         setError(err.response?.data?.error || 'Ошибка сохранения');
         setTimeout(() => setError(''), 3000);
         await loadData();
@@ -183,33 +205,15 @@ function Data() {
     }
   };
 
-  const onGridReady = (params) => {
-    console.log('📊 Grid готов:', params);
-    setGridApi(params.api);
-  };
-
-  const applyFilters = () => {
-    loadData();
-  };
+  const applyFilters = () => loadData();
 
   const resetFilters = () => {
     setFilters({
       search: '',
       profile: '',
       subject: '',
-      min_score: '',
-      sort_by: 'surname',
-      sort_order: 'asc'
+      min_score: ''
     });
-  };
-
-  const handleExport = () => {
-    if (gridApi) {
-      gridApi.exportDataAsExcel({
-        fileName: 'students_data.xlsx',
-        sheetName: 'Данные учащихся'
-      });
-    }
   };
 
   const defaultColDef = useMemo(() => ({
@@ -220,7 +224,7 @@ function Data() {
   }), []);
 
   return (
-    <div>
+    <div className="container-fluid py-4">
       <div className="mb-4">
         <h2>Данные учащихся</h2>
         <p className="text-muted">Таблица с результатами экзаменов и выбором профилей</p>
@@ -240,7 +244,6 @@ function Data() {
               <input
                 type="text"
                 className="form-control"
-                placeholder="Фамилия или имя"
                 value={filters.search}
                 onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
               />
@@ -253,8 +256,8 @@ function Data() {
                 onChange={(e) => setFilters(prev => ({ ...prev, profile: e.target.value }))}
               >
                 <option value="">Все профили</option>
-                {profiles.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
+                {profiles?.map(p => (
+                  <option key={p?.id} value={p?.id}>{p?.name}</option>
                 ))}
               </select>
             </div>
@@ -266,8 +269,8 @@ function Data() {
                 onChange={(e) => setFilters(prev => ({ ...prev, subject: e.target.value }))}
               >
                 <option value="">Все предметы</option>
-                {subjects.map(s => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
+                {subjects?.map(s => (
+                  <option key={s?.id} value={s?.id}>{s?.name}</option>
                 ))}
               </select>
             </div>
@@ -276,21 +279,13 @@ function Data() {
               <input
                 type="number"
                 className="form-control"
-                placeholder="0"
                 value={filters.min_score}
                 onChange={(e) => setFilters(prev => ({ ...prev, min_score: e.target.value }))}
               />
             </div>
             <div className="col-md-3 d-flex align-items-end gap-2">
-              <button className="btn btn-primary" onClick={applyFilters}>
-                Применить
-              </button>
-              <button className="btn btn-outline-secondary" onClick={resetFilters}>
-                Сброс
-              </button>
-              <button className="btn btn-success" onClick={handleExport}>
-                Excel
-              </button>
+              <button className="btn btn-primary" onClick={applyFilters}>Применить</button>
+              <button className="btn btn-outline-secondary" onClick={resetFilters}>Сброс</button>
             </div>
           </div>
         </div>
@@ -299,34 +294,32 @@ function Data() {
       {/* Таблица */}
       <div className="card">
         <div className="card-header">
-          <h5 className="mb-0">Данные ({rowData.length} записей)</h5>
+          <h5 className="mb-0">Данные ({rowData?.length || 0} записей)</h5>
         </div>
         <div className="card-body p-0">
           {loading ? (
-            <div className="loading-spinner p-5">
+            <div className="text-center p-5">
               <div className="spinner-border text-primary" role="status">
                 <span className="visually-hidden">Загрузка...</span>
               </div>
             </div>
-          ) : rowData.length === 0 ? (
+          ) : !rowData?.length ? (
             <div className="alert alert-info m-3">
               <i className="bi bi-info-circle me-2"></i>
-              Нет данных для отображения. Убедитесь, что в базе есть ученики с результатами.
+              Нет данных для отображения
             </div>
           ) : (
-            <div
-              className="ag-theme-alpine"
-              style={{ height: '600px', width: '100%' }}
-            >
+            <div className="ag-theme-alpine" style={{ height: '500px', width: '100%' }}>
               <AgGridReact
                 rowData={rowData}
                 columnDefs={columnDefs}
                 defaultColDef={defaultColDef}
                 pagination={true}
-                paginationPageSize={50}
-                stopEditingWhenGridLosesFocus={true}
-                onGridReady={onGridReady}
+                paginationPageSize={25}
+                paginationPageSizeSelector={[25, 50, 100]}
+                stopEditingWhenCellsLoseFocus={true}
                 onCellValueChanged={onCellValueChanged}
+                theme="legacy"
               />
             </div>
           )}

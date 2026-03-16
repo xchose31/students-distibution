@@ -11,7 +11,7 @@ const getMenuItems = () => {
     return [
       { path: '/admin/settings', label: 'Настройки', icon: 'bi-gear-fill' },
       { path: '/admin/exam-results', label: 'Результаты экзаменов', icon: 'bi-file-earmark-spreadsheet' },
-      { path: '/admin/data', label: 'Данные', icon: 'bi-table' }  // ← Уже должно быть
+      { path: '/admin/data', label: 'Данные', icon: 'bi-table' }
     ];
   } else {
     return [

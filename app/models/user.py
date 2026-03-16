@@ -22,6 +22,8 @@ class ComPerson(Base):
     created_at = Column(TIMESTAMP, server_default=func.current_timestamp())
     updated_at = Column(TIMESTAMP, server_default=func.current_timestamp(),
                         onupdate=func.current_timestamp())
+    enrolled_class = Column(String)
+    enrolled_profile = Column(String)
 
     user = relationship("User", back_populates="person")
     emp_post = relationship("EmpPost", back_populates="person", uselist=False)
