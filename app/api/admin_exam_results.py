@@ -28,15 +28,18 @@ def admin_required(f):
     return decorated
 
 
+# app/api/admin_exam_results.py
+
 @bp.route('/upload', methods=['POST'])
 @admin_required
 def upload_exam_results():
     """
     Загрузка результатов экзаменов из Excel файла
 
-    Последние 2 столбца (если есть):
-    - Предпоследний: Класс зачисления (например, "10-Г")
-    - Последний: Профиль зачисления (например, "Физико-технологический")
+    ТОЛЬКО столбцы с точными названиями интерпретируются как зачисление:
+    - "Класс зачисления" → enrolled_class
+    - "Профиль зачисления" → enrolled_profile
+    - Все остальные столбцы → результаты экзаменов
     """
 
     if 'file' not in request.files:
@@ -75,33 +78,30 @@ def upload_exam_results():
     all_columns = [col for col in df.columns if col != fio_column]
     print(f"📊 Столбцы данных: {all_columns}")
 
-    # 🔧 ОПРЕДЕЛЯЕМ СТОЛБЦЫ ЗАЧИСЛЕНИЯ
+    # 🔧 СТРОГОЕ ОПРЕДЕЛЕНИЕ СТОЛБЦОВ ЗАЧИСЛЕНИЯ
     enrolled_class_col = None
     enrolled_profile_col = None
 
-    # 🔍 Поиск по названиям (приоритет 1)
+    # 🔍 Поиск по ТОЧНЫМ названиям (без частичного match)
     for col in all_columns:
-        col_lower = str(col).lower().strip()
+        col_stripped = str(col).strip().lower()
 
-        # 🔴 Класс зачисления - ТОЛЬКО если содержит "класс"
-        if enrolled_class_col is None and 'класс' in col_lower:
+        # 🔴 ТОЛЬКО точное совпадение "класс зачисления"
+        if col_stripped == 'класс зачисления':
             enrolled_class_col = col
             print(f"✅ Найден столбец КЛАССА: '{col}'")
 
-        # 🔵 Профиль зачисления - ТОЛЬКО если содержит "профиль"
-        if enrolled_profile_col is None and 'профиль' in col_lower:
+        # 🔵 ТОЛЬКО точное совпадение "профиль зачисления"
+        if col_stripped == 'профиль зачисления':
             enrolled_profile_col = col
             print(f"✅ Найден столбец ПРОФИЛЯ: '{col}'")
 
-    # 🔧 Если не нашли по названиям — используем последние 2 столбца (fallback)
-    if len(all_columns) >= 2:
-        if not enrolled_class_col:
-            enrolled_class_col = all_columns[-2]
-            print(f"⚠️ Класс зачисления (по позиции - предпоследний): '{enrolled_class_col}'")
+    # 🔧 Если не нашли точных названий — все столбцы это предметы
+    if not enrolled_class_col:
+        print("⚠️ Столбец 'Класс зачисления' не найден (требуется точное название)")
 
-        if not enrolled_profile_col:
-            enrolled_profile_col = all_columns[-1]
-            print(f"⚠️ Профиль зачисления (по позиции - последний): '{enrolled_profile_col}'")
+    if not enrolled_profile_col:
+        print("⚠️ Столбец 'Профиль зачисления' не найден (требуется точное название)")
 
     # Столбцы-предметы (все кроме ФИО и столбцов зачисления)
     subject_columns = [

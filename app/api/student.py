@@ -78,9 +78,6 @@ def get_profiles():
     }), 200
 
 
-# app/api/student.py
-# app/api/student.py
-
 @bp.route('/profile', methods=['GET'])
 @jwt_required()
 def get_student_profile():
@@ -90,8 +87,6 @@ def get_student_profile():
     current_user_id = get_jwt_identity()
     user = User.query.get_or_404(int(current_user_id))
     person = user.person
-
-    print(f"📥 Запрос профиля для пользователя {user.id}, person_id={person.id}")
 
     # Результаты экзаменов
     exam_results = ExamResult.query.filter_by(person_id=person.id).all()
@@ -104,7 +99,6 @@ def get_student_profile():
         for r in exam_results
     ]
 
-    print(f"📊 Найдено результатов: {len(results)}")
 
     # Выбор профилей
     profile_choice = ProfileChoice.query.filter_by(person_id=person.id).first()
@@ -130,6 +124,5 @@ def get_student_profile():
         'avg_score': sum(r['result'] for r in results) / len(results) if results else None
     }
 
-    print(f"✅ Отправляем ответ: {response_data}")
 
     return jsonify(response_data), 200

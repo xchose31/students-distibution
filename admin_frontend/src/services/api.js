@@ -2,28 +2,22 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://127.0.0.1:5000/api',
+  baseURL: 'http://localhost:5000/api',
   headers: {
     'Content-Type': 'application/json'
   }
 });
 
-// Добавляем токен к каждому запросу
+// 🔧 Добавляем токен к КАЖДОМУ запросу
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token');
   if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+    config.headers.Authorization = `Bearer ${token}`;  // ← Важно: Bearer + пробел
   }
-
-  // Для FormData не устанавливаем Content-Type (браузер сам установит boundary)
-  if (!(config.data instanceof FormData)) {
-    config.headers['Content-Type'] = 'application/json';
-  }
-
   return config;
 });
 
-// Обрабатываем ошибки авторизации
+// 🔧 Обрабатываем 401 (токен истёк)
 api.interceptors.response.use(
   (response) => response,
   (error) => {

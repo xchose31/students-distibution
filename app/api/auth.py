@@ -13,21 +13,29 @@ def login():
     data = request.get_json()
     username = data.get('username')
     password = data.get('password')
-    remember_me = data.get('remember_me') or False
+    remember_me = data.get('remember_me', False)
+
     if not username or not password:
         return jsonify({"error": "Invalid credentials"}), 401
 
     user = User.query.filter_by(username=username).first()
 
     if user and user.check_password(password):
-        if remember_me:
-            access_token = create_access_token(
-                identity=str(user.id),
-                expires_delta=timedelta(days=7)
-            )
-        else:
-            access_token = create_access_token(
-                identity=str(user.id),
-                expires_delta=timedelta(hours=1))
-        return jsonify(access_token=access_token, user=user.to_dict()), 200
+        access_token = create_access_token(
+            identity=str(user.id),
+            expires_delta=None if remember_me else None
+        )
+
+        # 🔧 Возвращаем ФИО вместо только логина
+        person = user.person
+        return jsonify({
+            "access_token": access_token,
+            "user": {
+                "id": user.id,
+                "username": user.username,
+                "is_admin": person.emp_post.role.role == 'distribution' if person.emp_post else False,
+                "fio": f"{person.surname} {person.name} {person.patro}".strip() if person else user.username  # ← ФИО
+            }
+        }), 200
+
     return jsonify({"error": "Invalid credentials"}), 401

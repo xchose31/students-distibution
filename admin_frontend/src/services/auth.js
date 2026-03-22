@@ -1,30 +1,31 @@
 // admin_frontend/src/services/auth.js
-import api from './api';
+
+const API_URL = 'http://localhost:5000/api';
 
 export const authService = {
   login: async (username, password, rememberMe = false) => {
-    const response = await api.post('/login', {
-      username,
-      password,
-      remember_me: rememberMe  // ← Отправляем на бэкенд
+    const response = await fetch(`${API_URL}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password, remember_me: rememberMe })
     });
-    if (response.data.access_token) {
-      localStorage.setItem('access_token', response.data.access_token);
-      const user = {
-        ...response.data.user,
-        is_admin: response.data.user.role === 'admin'
-      };
-      localStorage.setItem('user', JSON.stringify(user));
 
-      // Если "запомнить меня" не выбрано, очищаем данные при закрытии вкладки
-      if (!rememberMe) {
-        window.addEventListener('beforeunload', () => {
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('user');
-        });
-      }
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Ошибка входа');
     }
-    return response.data;
+
+    const data = await response.json();
+
+    // 🔧 Сохраняем токен и пользователя
+    if (data.access_token) {
+      localStorage.setItem('access_token', data.access_token);
+    }
+    if (data.user) {
+      localStorage.setItem('user', JSON.stringify(data.user));
+    }
+
+    return data;
   },
 
   logout: () => {
@@ -32,12 +33,16 @@ export const authService = {
     localStorage.removeItem('user');
   },
 
-  getCurrentUser: () => {
-    const user = localStorage.getItem('user');
-    return user ? JSON.parse(user) : null;
-  },
-
   isAuthenticated: () => {
     return !!localStorage.getItem('access_token');
+  },
+
+  getCurrentUser: () => {
+    const userStr = localStorage.getItem('user');
+    return userStr ? JSON.parse(userStr) : null;
+  },
+
+  getToken: () => {
+    return localStorage.getItem('access_token');
   }
 };

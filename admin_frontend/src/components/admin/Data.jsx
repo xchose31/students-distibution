@@ -139,6 +139,10 @@ function Data() {
     loadData();
   }, [loadData]);
 
+  // 🔧 УДАЛЕНО: useEffect с gridApi.setRowData (строка 149)
+  // В AG Grid v35 не нужно вызывать setRowData через API
+  // React state (rowData) автоматически обновляет таблицу
+
   // Обработка изменений ячеек
   const onCellValueChanged = async (event) => {
     const personId = event.data?.person_id;
@@ -204,6 +208,9 @@ function Data() {
       }
     }
   };
+
+  // 🔧 УДАЛЕНО: onGridReady с params.api.setRowData (строка 203)
+  // В AG Grid v35 это не нужно
 
   const applyFilters = () => loadData();
 

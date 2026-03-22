@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { authService } from '../services/auth';
 import '../App.css';
 
-function Login({ onLoginSuccess }) {
+function Login({ onLogin }) {  // 🔧 Исправлено: onLoginSuccess → onLogin
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -20,10 +20,20 @@ function Login({ onLoginSuccess }) {
 
     try {
       const data = await authService.login(username, password, rememberMe);
-      onLoginSuccess(data.user);
-      navigate('/student/profile');
+
+      // 🔧 Вызываем callback с правильными данными
+      onLogin(data.user);
+
+      // 🔧 Редирект в зависимости от роли
+      if (data.user?.is_admin) {
+        navigate('/admin/data', { replace: true });
+      } else {
+        navigate('/student/profile', { replace: true });
+      }
     } catch (err) {
-      setError(err.response?.data?.error || 'Ошибка входа');
+      // 🔧 Исправлено: fetch не имеет err.response
+      setError(err.message || 'Ошибка входа');
+      console.error('Login error:', err);
     } finally {
       setLoading(false);
     }

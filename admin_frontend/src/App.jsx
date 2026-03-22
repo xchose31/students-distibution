@@ -1,18 +1,20 @@
 // admin_frontend/src/App.jsx
-import Results from './components/student/Results';
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import Login from './components/Login';
 import Layout from './components/Layout';
 import Settings from './components/admin/Settings';
 import ExamResults from './components/admin/ExamResults';
-import Data from './components/admin/Data';  // ← ← ← ДОБАВИТЬ ЭТУ СТРОКУ
+import Data from './components/admin/Data';
 import ProfileChoice from './components/student/ProfileChoice';
-import ResultsStub from './components/student/ResultsStub';
+import Results from './components/student/Results';
 import { authService } from './services/auth';
 
-function PrivateRoute({ children, user }) {
-  return authService.isAuthenticated() ? (
+function PrivateRoute({ children }) {
+  const isAuthenticated = authService.isAuthenticated();
+  const user = authService.getCurrentUser();
+
+  return isAuthenticated ? (
     <Layout user={user} onLogout={() => {
       authService.logout();
       window.location.href = '/login';
@@ -20,7 +22,7 @@ function PrivateRoute({ children, user }) {
       {children}
     </Layout>
   ) : (
-    <Navigate to="/login" />
+    <Navigate to="/login" replace />
   );
 }
 
@@ -29,13 +31,21 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const currentUser = authService.getCurrentUser();
-    setUser(currentUser);
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      const currentUser = authService.getCurrentUser();
+      setUser(currentUser);
+    }
     setLoading(false);
   }, []);
 
-  const handleLoginSuccess = (userData) => {
+  const handleLogin = (userData) => {
     setUser(userData);
+  };
+
+  const handleLogout = () => {
+    authService.logout();
+    setUser(null);
   };
 
   if (loading) {
@@ -48,64 +58,50 @@ function App() {
     );
   }
 
-return (
+  return (
     <BrowserRouter>
       <Routes>
-          <Route
-  path="/student/results"
-  element={
-    <PrivateRoute user={user}>
-      <Results />  // ← Компонент существует?
-    </PrivateRoute>
-  }
-/>
-        <Route path="/login" element={<Login onLoginSuccess={handleLoginSuccess} />} />
-        <Route
-          path="/admin/settings"
-          element={
-            <PrivateRoute user={user}>
-              <Settings />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/admin/exam-results"
-          element={
-            <PrivateRoute user={user}>
-              <ExamResults />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/admin/data"
-          element={
-            <PrivateRoute user={user}>
-              <Data />
-            </PrivateRoute>
-          }
-        />  // ← Добавить маршрут
-        <Route
-          path="/student/profile"
-          element={
-            <PrivateRoute user={user}>
-              <ProfileChoice />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/student/results"
-          element={
-            <PrivateRoute user={user}>
-              <ResultsStub />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/"
-          element={
-            <Navigate to={user?.is_admin ? '/admin/settings' : '/student/profile'} />
-          }
-        />
+        {/* 🔧 onLogin → совпадает с Login.jsx */}
+        <Route path="/login" element={<Login onLogin={handleLogin} />} />
+
+        {/* 🔧 Убрано дублирование Layout */}
+        <Route path="/admin/settings" element={
+          <PrivateRoute>
+            <Settings />
+          </PrivateRoute>
+        } />
+
+        <Route path="/admin/exam-results" element={
+          <PrivateRoute>
+            <ExamResults />
+          </PrivateRoute>
+        } />
+
+        <Route path="/admin/data" element={
+          <PrivateRoute>
+            <Data />
+          </PrivateRoute>
+        } />
+
+        <Route path="/student/profile" element={
+          <PrivateRoute>
+            <ProfileChoice />
+          </PrivateRoute>
+        } />
+
+        <Route path="/student/results" element={
+          <PrivateRoute>
+            <Results />
+          </PrivateRoute>
+        } />
+
+        <Route path="/" element={
+          <PrivateRoute>
+            <Navigate to={user?.is_admin ? "/admin/data" : "/student/profile"} replace />
+          </PrivateRoute>
+        } />
+
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );
