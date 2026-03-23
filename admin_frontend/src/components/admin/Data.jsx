@@ -271,9 +271,7 @@ function Data() {
 
       {error && <div className="alert alert-danger">{error}</div>}
 
-      {/* 🔧 УДАЛЕНО: Блок фильтров */}
 
-      {/* Таблица */}
       <div className="card">
         <div className="card-header">
           <h5 className="mb-0">Данные ({rowData?.length || 0} записей)</h5>

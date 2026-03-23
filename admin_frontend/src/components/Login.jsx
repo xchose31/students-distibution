@@ -21,10 +21,8 @@ function Login({ onLogin }) {  // 🔧 Исправлено: onLoginSuccess → 
     try {
       const data = await authService.login(username, password, rememberMe);
 
-      // 🔧 Вызываем callback с правильными данными
       onLogin(data.user);
 
-      // 🔧 Редирект в зависимости от роли
       if (data.user?.is_admin) {
         navigate('/admin/data', { replace: true });
       } else {
