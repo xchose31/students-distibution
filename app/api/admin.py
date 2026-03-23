@@ -13,7 +13,7 @@ def admin_required(f):
     def decorated(*args, **kwargs):
         current_user_id = get_jwt_identity()
         user = User.query.get(int(current_user_id))
-        if not user or not user.person.emp_post.role.role == 'distribution':
+        if not user or not user.person.emp_post or not user.person.emp_post.role.role == 'distribution':
             return jsonify({"error": "Admin access required"}), 403
         return f(*args, **kwargs)
     return decorated

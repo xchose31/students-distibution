@@ -2,14 +2,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../services/auth';
-import '../App.css';
 
-function Login({ onLogin }) {  // 🔧 Исправлено: onLoginSuccess → onLogin
+function Login({ onLogin }) {
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -20,16 +18,9 @@ function Login({ onLogin }) {  // 🔧 Исправлено: onLoginSuccess → 
 
     try {
       const data = await authService.login(username, password, rememberMe);
-
       onLogin(data.user);
-
-      if (data.user?.is_admin) {
-        navigate('/admin/data', { replace: true });
-      } else {
-        navigate('/student/profile', { replace: true });
-      }
+      navigate('/');
     } catch (err) {
-      // 🔧 Исправлено: fetch не имеет err.response
       setError(err.message || 'Ошибка входа');
       console.error('Login error:', err);
     } finally {
@@ -37,65 +28,58 @@ function Login({ onLogin }) {  // 🔧 Исправлено: onLoginSuccess → 
     }
   };
 
-  const togglePasswordVisibility = () => {
-    setShowPassword(!showPassword);
-  };
-
   return (
     <div className="login-page">
-      <div className="login-card">
-        <h3 className="text-center mb-4">Вход в систему</h3>
-
-        {error && (
-          <div className="alert alert-danger" role="alert">
-            {error}
-          </div>
-        )}
-
+      <main className="form-signin">
         <form onSubmit={handleSubmit}>
-          <div className="mb-3">
-            <label className="form-label">Логин</label>
+          {/* Логотип */}
+          <img className="mb-4" src="/lis_logo.png" alt="Logo" width="72" height="72" />
+
+          <h1 className="h3 mb-3 fw-normal">Авторизация</h1>
+
+          {error && (
+            <div className="alert alert-danger mt-3" role="alert">
+              {error}
+            </div>
+          )}
+
+          {/* Поле логина */}
+          <div className="form-floating mb-2">
             <input
               type="text"
               className="form-control"
-              placeholder="Введите логин"
+              id="floatingInput"
+              placeholder="Пользователь"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
               disabled={loading}
               autoComplete="username"
             />
+            <label htmlFor="floatingInput">Имя пользователя</label>
           </div>
 
-          <div className="mb-3">
-            <label className="form-label">Пароль</label>
-            <div className="input-group">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                className="form-control"
-                placeholder="Введите пароль"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={loading}
-                autoComplete="current-password"
-              />
-              <button
-                type="button"
-                className="btn btn-outline-secondary"
-                onClick={togglePasswordVisibility}
-                disabled={loading}
-                style={{ borderTopRightRadius: '0.375rem', borderBottomRightRadius: '0.375rem' }}
-              >
-                <i className={`bi ${showPassword ? 'bi-eye-slash' : 'bi-eye'}`}></i>
-              </button>
-            </div>
-          </div>
-
-          <div className="mb-3 form-check">
+          {/* Поле пароля */}
+          <div className="form-floating mb-2">
             <input
-              type="checkbox"
+              type="password"
+              className="form-control"
+              id="floatingPassword"
+              placeholder="Пароль"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              disabled={loading}
+              autoComplete="current-password"
+            />
+            <label htmlFor="floatingPassword">Пароль</label>
+          </div>
+
+          {/* Запомнить меня */}
+          <div className="form-check text-start my-3">
+            <input
               className="form-check-input"
+              type="checkbox"
               id="rememberMe"
               checked={rememberMe}
               onChange={(e) => setRememberMe(e.target.checked)}
@@ -106,9 +90,10 @@ function Login({ onLogin }) {  // 🔧 Исправлено: onLoginSuccess → 
             </label>
           </div>
 
+          {/* Кнопка входа */}
           <button
+            className="w-100 btn btn-lg btn-primary"
             type="submit"
-            className="btn btn-primary w-100"
             disabled={loading}
           >
             {loading ? (
@@ -120,8 +105,27 @@ function Login({ onLogin }) {  // 🔧 Исправлено: onLoginSuccess → 
               'Войти'
             )}
           </button>
+
+          {/* Ссылка на восстановление */}
+          <div className="container mt-3">
+            <div className="row">
+              <div className="col text-start">
+                {/* Место для регистрации (если нужно) */}
+              </div>
+              <div className="col text-end">
+                <p>
+                  <a href="/recover">
+                    <nobr>Восстановить доступ</nobr>
+                  </a>
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Футер */}
+          <p className="mt-5 mb-3 text-muted">© 2017–2026</p>
         </form>
-      </div>
+      </main>
     </div>
   );
 }
