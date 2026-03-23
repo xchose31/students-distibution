@@ -17,13 +17,7 @@ function Data() {
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
-  const [filters, setFilters] = useState({
-    search: '',
-    profile: '',
-    subject: '',
-    min_score: ''
-  });
+  const [exporting, setExporting] = useState(false);
 
   // Загрузка данных
   const loadData = useCallback(async () => {
@@ -31,13 +25,7 @@ function Data() {
     setError('');
 
     try {
-      const params = new URLSearchParams();
-      if (filters.search) params.append('search', filters.search);
-      if (filters.profile) params.append('profile', filters.profile);
-      if (filters.subject) params.append('subject', filters.subject);
-      if (filters.min_score) params.append('min_score', filters.min_score);
-
-      const response = await api.get(`/admin/data?${params.toString()}`);
+      const response = await api.get(`/admin/data`);
 
       setRowData(response.data?.data || []);
       setSubjects(response.data?.subjects || []);
@@ -49,7 +37,7 @@ function Data() {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, []);
 
   // Построение колонок
   useEffect(() => {
@@ -212,15 +200,40 @@ function Data() {
   // 🔧 УДАЛЕНО: onGridReady с params.api.setRowData (строка 203)
   // В AG Grid v35 это не нужно
 
-  const applyFilters = () => loadData();
+  // Экспорт в Excel
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const response = await api.get('/admin/data/export', {
+        responseType: 'blob'
+      });
 
-  const resetFilters = () => {
-    setFilters({
-      search: '',
-      profile: '',
-      subject: '',
-      min_score: ''
-    });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = 'students_data.xlsx';
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="?([^"]+)"?/);
+        if (match && match[1]) {
+          filename = match[1];
+        }
+      }
+
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+    } catch (err) {
+      console.error('Ошибка экспорта:', err);
+      setError('Ошибка при экспорте данных');
+      setTimeout(() => setError(''), 3000);
+    } finally {
+      setExporting(false);
+    }
   };
 
   const defaultColDef = useMemo(() => ({
@@ -232,71 +245,33 @@ function Data() {
 
   return (
     <div className="container-fluid py-4">
-      <div className="mb-4">
-        <h2>Данные учащихся</h2>
-        <p className="text-muted">Таблица с результатами экзаменов и выбором профилей</p>
+      <div className="mb-4 d-flex justify-content-between align-items-center">
+        <div>
+          <h2>Данные учащихся</h2>
+          <p className="text-muted">Таблица с результатами экзаменов и выбором профилей</p>
+        </div>
+        <button
+          className="btn btn-success"
+          onClick={handleExport}
+          disabled={exporting || loading}
+        >
+          {exporting ? (
+            <>
+              <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+              Экспорт...
+            </>
+          ) : (
+            <>
+              <i className="bi bi-file-earmark-excel me-2"></i>
+              Экспорт в Excel
+            </>
+          )}
+        </button>
       </div>
 
       {error && <div className="alert alert-danger">{error}</div>}
 
-      {/* Фильтры */}
-      <div className="card mb-4">
-        <div className="card-header">
-          <h5 className="mb-0">Фильтры</h5>
-        </div>
-        <div className="card-body">
-          <div className="row g-3">
-            <div className="col-md-3">
-              <label className="form-label">Поиск по ФИО</label>
-              <input
-                type="text"
-                className="form-control"
-                value={filters.search}
-                onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
-              />
-            </div>
-            <div className="col-md-2">
-              <label className="form-label">Профиль</label>
-              <select
-                className="form-select"
-                value={filters.profile}
-                onChange={(e) => setFilters(prev => ({ ...prev, profile: e.target.value }))}
-              >
-                <option value="">Все профили</option>
-                {profiles?.map(p => (
-                  <option key={p?.id} value={p?.id}>{p?.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="col-md-2">
-              <label className="form-label">Предмет</label>
-              <select
-                className="form-select"
-                value={filters.subject}
-                onChange={(e) => setFilters(prev => ({ ...prev, subject: e.target.value }))}
-              >
-                <option value="">Все предметы</option>
-                {subjects?.map(s => (
-                  <option key={s?.id} value={s?.id}>{s?.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="col-md-2">
-              <label className="form-label">Мин. балл</label>
-              <input
-                type="number"
-                className="form-control"
-                value={filters.min_score}
-                onChange={(e) => setFilters(prev => ({ ...prev, min_score: e.target.value }))}
-              />
-            </div>
-            <div className="col-md-3 d-flex align-items-end gap-2">
-              <button className="btn btn-primary" onClick={applyFilters}>Применить</button>
-              <button className="btn btn-outline-secondary" onClick={resetFilters}>Сброс</button>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* 🔧 УДАЛЕНО: Блок фильтров */}
 
       {/* Таблица */}
       <div className="card">

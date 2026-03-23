@@ -1,5 +1,5 @@
 # app/api/admin_data.py
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, send_file
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from functools import wraps
 from ..extensions import db
@@ -8,6 +8,8 @@ from ..models.user import Subject, ExamResult, EmpPost, EmpPostRoles
 from ..models.user import ClassProfile
 from ..models.user import ProfileChoice
 from sqlalchemy import func
+import pandas as pd
+from io import BytesIO
 
 bp = Blueprint('admin_data', __name__, url_prefix='/admin/data')
 
@@ -296,12 +298,88 @@ def get_profiles():
 @admin_required
 def export_data():
     """
-    Экспорт данных в Excel (заготовка)
-
-    Query params: те же что и для GET /api/admin/data
+    Экспорт всех данных учащихся в Excel
     """
-    # TODO: Реализовать экспорт в Excel
-    return jsonify({
-        "message": "Экспорт в разработке",
-        "hint": "Используйте GET /api/admin/data для получения JSON"
-    }), 200
+    try:
+        # Получаем все данные (аналогично get_all_data)
+        query = ComPerson.query.join(User, User.pers_id == ComPerson.id, isouter=True)
+
+        # Исключаем администраторов
+        query = query.filter(
+            ~ComPerson.emp_post.has(
+                EmpPost.role.has(
+                    EmpPostRoles.role == 'distribution'
+                )
+            )
+        )
+
+        persons = query.all()
+
+        # Получаем все предметы
+        subjects = Subject.query.order_by(Subject.name).all()
+
+        # Формируем данные для Excel
+        rows = []
+        for person in persons:
+            # Результаты экзаменов
+            exam_results = ExamResult.query.filter_by(person_id=person.id).all()
+            results_dict = {r.subject.name: r.result for r in exam_results}
+
+            # Выбор профилей
+            profile_choice = ProfileChoice.query.filter_by(person_id=person.id).first()
+
+            row = {
+                'ФИО': f'{person.surname} {person.name} {person.patro}',
+                'Класс зачисления': person.enrolled_class or '',
+                'Профиль зачисления': person.enrolled_profile or '',
+                '1 приоритет': profile_choice.first_choice.name if profile_choice and profile_choice.first_choice else '',
+                '2 приоритет': profile_choice.second_choice.name if profile_choice and profile_choice.second_choice else '',
+                '3 приоритет': profile_choice.third_choice.name if profile_choice and profile_choice.third_choice else '',
+            }
+
+            # Добавляем результаты по предметам
+            for subject in subjects:
+                row[subject.name] = results_dict.get(subject.name, '')
+
+            rows.append(row)
+
+        # Создаем DataFrame
+        df = pd.DataFrame(rows)
+
+        # Переупорядочиваем колонки (ФИО + зачисление + приоритеты + предметы)
+        base_cols = ['ФИО', 'Класс зачисления', 'Профиль зачисления', '1 приоритет', '2 приоритет', '3 приоритет']
+        subject_cols = [s.name for s in subjects]
+        all_cols = base_cols + subject_cols
+
+        # Фильтруем только существующие колонки
+        df = df[[col for col in all_cols if col in df.columns]]
+
+        # Создаем Excel файл в памяти
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, sheet_name='Данные учащихся')
+
+            # Форматирование
+            worksheet = writer.sheets['Данные учащихся']
+
+            # Ширина колонок
+            worksheet.column_dimensions['A'].width = 35  # ФИО
+            worksheet.column_dimensions['B'].width = 18  # Класс
+            worksheet.column_dimensions['C'].width = 30  # Профиль
+
+        output.seek(0)
+
+        # Генерируем имя файла с датой
+        from datetime import datetime
+        filename = f'students_data_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=filename
+        )
+
+    except Exception as e:
+        print(f"❌ Ошибка экспорта: {e}")
+        return jsonify({"error": f"Ошибка экспорта: {str(e)}"}), 500
