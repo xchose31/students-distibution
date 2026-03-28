@@ -28,8 +28,6 @@ def admin_required(f):
     return decorated
 
 
-# app/api/admin_exam_results.py
-
 @bp.route('/upload', methods=['POST'])
 @admin_required
 def upload_exam_results():
@@ -58,9 +56,6 @@ def upload_exam_results():
     except Exception as e:
         return jsonify({"error": f"Ошибка чтения файла: {str(e)}"}), 400
 
-    # 🔧 ОТЛАДКА: Выводим названия всех столбцов
-    print("📋 Все столбцы в файле:", list(df.columns))
-
     # Проверяем наличие столбца ФИО
     fio_column = None
     for col in df.columns:
@@ -72,15 +67,15 @@ def upload_exam_results():
     if fio_column is None:
         return jsonify({"error": "В файле не найден столбец 'ФИО'"}), 400
 
-    print(f"✅ Столбец ФИО: {fio_column}")
-
     # Получаем все столбцы кроме ФИО
     all_columns = [col for col in df.columns if col != fio_column]
-    print(f"📊 Столбцы данных: {all_columns}")
 
     # 🔧 СТРОГОЕ ОПРЕДЕЛЕНИЕ СТОЛБЦОВ ЗАЧИСЛЕНИЯ
     enrolled_class_col = None
     enrolled_profile_col = None
+    f_prof_col = None
+    s_prof_col = None
+    t_prof_col = None
 
     # 🔍 Поиск по ТОЧНЫМ названиям (без частичного match)
     for col in all_columns:
@@ -89,39 +84,33 @@ def upload_exam_results():
         # 🔴 ТОЛЬКО точное совпадение "класс зачисления"
         if col_stripped == 'класс зачисления':
             enrolled_class_col = col
-            print(f"✅ Найден столбец КЛАССА: '{col}'")
 
         # 🔵 ТОЛЬКО точное совпадение "профиль зачисления"
         if col_stripped == 'профиль зачисления':
             enrolled_profile_col = col
-            print(f"✅ Найден столбец ПРОФИЛЯ: '{col}'")
 
-    # 🔧 Если не нашли точных названий — все столбцы это предметы
-    if not enrolled_class_col:
-        print("⚠️ Столбец 'Класс зачисления' не найден (требуется точное название)")
+        if col_stripped == '1 приоритет':
+            f_prof_col = col
+        if col_stripped == '2 приоритет':
+            s_prof_col = col
+        if col_stripped == '3 приоритет':
+            t_prof_col = col
 
-    if not enrolled_profile_col:
-        print("⚠️ Столбец 'Профиль зачисления' не найден (требуется точное название)")
-
-    # Столбцы-предметы (все кроме ФИО и столбцов зачисления)
     subject_columns = [
         col for col in all_columns
-        if col != enrolled_class_col and col != enrolled_profile_col
+        if
+        col != enrolled_class_col and col != enrolled_profile_col and col != f_prof_col and col != s_prof_col and col != t_prof_col
     ]
 
-    print(f"📚 Столбцы-предметы: {subject_columns}")
-    print(f"🏫 Класс зачисления: '{enrolled_class_col}'")
-    print(f"🎓 Профиль зачисления: '{enrolled_profile_col}'")
-
-    # Статистика импорта
     stats = {
         'total_rows': len(df),
         'success': 0,
         'failed': 0,
         'failed_students': [],
-        'duplicate_results': [],
+        'updated_results': [],  # 🔧 Новое: обновлённые оценки
         'subjects_created': [],
         'results_added': 0,
+        'results_updated': 0,  # 🔧 Новое: счётчик обновлений
         'enrollment_updated': 0
     }
 
@@ -173,7 +162,7 @@ def upload_exam_results():
             continue
 
         student_results = 0
-        student_duplicates = []
+        student_updated = []  # 🔧 Новое: обновлённые оценки ученика
         enrollment_updated = False
 
         # 🔧 Обработка класса и профиля зачисления
@@ -182,13 +171,11 @@ def upload_exam_results():
 
         if enrolled_class_col:
             class_value = row[enrolled_class_col]
-            print(f"  🔍 Значение класса из столбца '{enrolled_class_col}': {class_value}")
             if pd.notna(class_value) and str(class_value).strip() and str(class_value).strip() != 'nan':
                 enrolled_class = str(class_value).strip()
 
         if enrolled_profile_col:
             profile_value = row[enrolled_profile_col]
-            print(f"  🔍 Значение профиля из столбца '{enrolled_profile_col}': {profile_value}")
             if pd.notna(profile_value) and str(profile_value).strip() and str(profile_value).strip() != 'nan':
                 enrolled_profile = str(profile_value).strip()
 
@@ -196,10 +183,8 @@ def upload_exam_results():
         if enrolled_class or enrolled_profile:
             if enrolled_class:
                 person.enrolled_class = enrolled_class
-                print(f"  ✅ person.enrolled_class = {enrolled_class}")
             if enrolled_profile:
                 person.enrolled_profile = enrolled_profile
-                print(f"  ✅ person.enrolled_profile = {enrolled_profile}")
             enrollment_updated = True
 
         # Обработка результатов экзаменов
@@ -218,50 +203,53 @@ def upload_exam_results():
             subject = subject_cache.get(subject_name)
 
             if not subject:
-                subject = Subject.query.filter_by(name=subject_name).first()
+                subject = Subject.query.filter_by(name=subject_name.lower()).first()
 
                 if not subject:
-                    subject = Subject(name=subject_name)
+                    subject = Subject(name=subject_name.lower())
                     db.session.add(subject)
                     stats['subjects_created'].append(subject_name)
                     db.session.flush()
 
                 subject_cache[subject_name] = subject
 
-            # Проверка на дубликат
+            # 🔧 ПРОВЕРКА НА СУЩЕСТВУЮЩИЙ РЕЗУЛЬТАТ
             existing_result = ExamResult.query.filter_by(
                 person_id=person.id,
                 subject_id=subject.id
             ).first()
 
             if existing_result:
-                student_duplicates.append({
-                    'subject': subject_name,
-                    'existing_score': existing_result.result,
-                    'new_score': score_value
-                })
-                continue
+                # 🔧 ЗАМЕНЯЕМ СТАРУЮ ОЦЕНКУ НА НОВУЮ
+                if existing_result.result != score_value:
+                    student_updated.append({
+                        'subject': subject_name,
+                        'old_score': existing_result.result,
+                        'new_score': score_value
+                    })
+                    existing_result.result = score_value
+                    stats['results_updated'] += 1
+                # Если оценка не изменилась — ничего не делаем
+            else:
+                # Создаём новый результат
+                exam_result = ExamResult(
+                    person_id=person.id,
+                    subject_id=subject.id,
+                    result=score_value
+                )
+                db.session.add(exam_result)
+                student_results += 1
 
-            # Создаём новый результат
-            exam_result = ExamResult(
-                person_id=person.id,
-                subject_id=subject.id,
-                result=score_value
-            )
-            db.session.add(exam_result)
-            student_results += 1
-
-        # Статистика по дубликатам
-        if student_duplicates:
-            stats['duplicate_results'].append({
+        # 🔧 Статистика по обновлённым оценкам
+        if student_updated:
+            stats['updated_results'].append({
                 'row': index + 2,
                 'fio': fio_raw,
                 'person_id': person.id,
-                'duplicates': student_duplicates
+                'updated': student_updated
             })
-            stats['failed'] += len(student_duplicates)
 
-        if student_results > 0 or enrollment_updated:
+        if student_results > 0 or enrollment_updated or student_updated:
             stats['success'] += 1
 
         if enrollment_updated:
@@ -270,8 +258,6 @@ def upload_exam_results():
         stats['results_added'] += student_results
 
     db.session.commit()
-
-    print(f"🎉 Импорт завершён: {stats['success']} успешно, {stats['enrollment_updated']} зачислений")
 
     # Формируем ответ
     response = {
@@ -282,16 +268,19 @@ def upload_exam_results():
             'success': stats['success'],
             'failed': stats['failed'],
             'results_added': stats['results_added'],
+            'results_updated': stats['results_updated'],  # 🔧 Новое
             'subjects_created': len(stats['subjects_created']),
-            'duplicates_found': len(stats['duplicate_results']),
             'enrollment_updated': stats['enrollment_updated']
         }
     }
 
-    if stats['failed'] > 0 or stats['duplicate_results']:
+    if stats['failed'] > 0:
         response['warning'] = f'{stats["failed"]} ошибок импортировано'
         response['failed_details'] = stats['failed_students']
-        response['duplicate_details'] = stats['duplicate_results']
+
+    # 🔧 Добавляем информацию об обновлённых оценках
+    if stats['results_updated'] > 0:
+        response['updated_details'] = stats['updated_results']
 
     return jsonify(response), 200
 

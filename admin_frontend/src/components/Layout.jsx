@@ -43,7 +43,7 @@ function Layout({ user, onLogout, children }) {
         <div className="sidebar-header">
           <Link to="/" className="sidebar-brand">
             <i className="bi bi-mortarboard-fill"></i>
-            <span className="brand-text">Школа</span>
+            <span className="brand-text">ЛИС</span>
           </Link>
           <button
             className="sidebar-collapse-btn"
@@ -88,7 +88,7 @@ function Layout({ user, onLogout, children }) {
         </main>
 
         <footer className="content-footer">
-          <p className="mb-0 text-muted small">© 2025 Система распределения учащихся</p>
+          <p className="mb-0 text-muted small">© 2026 ЛИС</p>
         </footer>
       </div>
     </div>

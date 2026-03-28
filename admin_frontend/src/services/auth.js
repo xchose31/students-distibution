@@ -27,6 +27,30 @@ export const authService = {
 
     return data;
   },
+  loginByToken: async (token) => {
+    const response = await fetch(`${API_URL}/login-by-token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Ошибка входа по токену');
+    }
+
+    const data = await response.json();
+
+    // Сохраняем токен и пользователя
+    if (data.access_token) {
+      localStorage.setItem('access_token', data.access_token);
+    }
+    if (data.user) {
+      localStorage.setItem('user', JSON.stringify(data.user));
+    }
+
+    return data;
+  },
 
   logout: () => {
     localStorage.removeItem('access_token');

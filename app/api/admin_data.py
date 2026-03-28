@@ -168,8 +168,6 @@ def update_data():
     """
     data = request.get_json()
 
-    print(f"📥 Получен запрос: {data}")  # ← Лог для отладки
-
     if not data or 'person_id' not in data or 'updates' not in data:
         return jsonify({"error": "Неверный формат данных"}), 400
 
@@ -180,8 +178,6 @@ def update_data():
     person = ComPerson.query.get(person_id)
     if not person:
         return jsonify({"error": "Ученик не найден"}), 404
-
-    print(f"✅ Найдён ученик: {person.name} {person.surname}")
 
     # Обновляем личные данные
     if 'surname' in updates:
@@ -196,11 +192,9 @@ def update_data():
     # 🔧 Обновляем поля зачисления (ОБЯЗАТЕЛЬНО!)
     if 'enrolled_class' in updates:
         person.enrolled_class = updates['enrolled_class']
-        print(f"📝 Класс зачисления: {updates['enrolled_class']}")
 
     if 'enrolled_profile' in updates:
         person.enrolled_profile = updates['enrolled_profile']
-        print(f"📝 Профиль зачисления: {updates['enrolled_profile']}")
 
     # Обновляем результаты экзаменов
     if 'results' in updates:
@@ -247,7 +241,6 @@ def update_data():
             profile_choice.third_choice_id = updates['third_choice_id']
 
     db.session.commit()
-    print(f"✅ Данные сохранены")
 
     # Возвращаем обновлённые данные
     exam_results = ExamResult.query.filter_by(person_id=person_id).all()
