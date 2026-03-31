@@ -3,6 +3,7 @@
 const API_URL = 'http://localhost:5000/api';
 
 export const authService = {
+  // Стандартный вход по логину/паролю
   login: async (username, password, rememberMe = false) => {
     const response = await fetch(`${API_URL}/login`, {
       method: 'POST',
@@ -17,7 +18,6 @@ export const authService = {
 
     const data = await response.json();
 
-    // 🔧 Сохраняем токен и пользователя
     if (data.access_token) {
       localStorage.setItem('access_token', data.access_token);
     }
@@ -27,11 +27,13 @@ export const authService = {
 
     return data;
   },
+
+  // 🔧 НОВАЯ ФУНКЦИЯ: Вход по токену из внешней системы
   loginByToken: async (token) => {
-    const response = await fetch(`${API_URL}/login-by-token`, {
+    const response = await fetch(`${API_URL}/login_by_token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token })
+      body: JSON.stringify({ auth_code: token })  // ← Отправляем как auth_code
     });
 
     if (!response.ok) {
@@ -41,7 +43,7 @@ export const authService = {
 
     const data = await response.json();
 
-    // Сохраняем токен и пользователя
+    // Сохраняем токен и пользователя (так же как при обычном входе)
     if (data.access_token) {
       localStorage.setItem('access_token', data.access_token);
     }

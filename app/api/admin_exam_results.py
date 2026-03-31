@@ -137,7 +137,7 @@ def upload_exam_results():
             stats['failed_students'].append({
                 'row': index + 2,
                 'fio': fio_raw,
-                'error': 'Неверный формат ФИО (ожидалось: Имя Фамилия Отчество)'
+                'error': 'Неверный формат ФИО (ожидалось: Фамилия Имя Отчество)'
             })
             continue
 
@@ -162,10 +162,9 @@ def upload_exam_results():
             continue
 
         student_results = 0
-        student_updated = []  # 🔧 Новое: обновлённые оценки ученика
+        student_updated = []
         enrollment_updated = False
 
-        # 🔧 Обработка класса и профиля зачисления
         enrolled_class = None
         enrolled_profile = None
 
@@ -213,14 +212,12 @@ def upload_exam_results():
 
                 subject_cache[subject_name] = subject
 
-            # 🔧 ПРОВЕРКА НА СУЩЕСТВУЮЩИЙ РЕЗУЛЬТАТ
             existing_result = ExamResult.query.filter_by(
                 person_id=person.id,
                 subject_id=subject.id
             ).first()
 
             if existing_result:
-                # 🔧 ЗАМЕНЯЕМ СТАРУЮ ОЦЕНКУ НА НОВУЮ
                 if existing_result.result != score_value:
                     student_updated.append({
                         'subject': subject_name,
@@ -240,7 +237,6 @@ def upload_exam_results():
                 db.session.add(exam_result)
                 student_results += 1
 
-        # 🔧 Статистика по обновлённым оценкам
         if student_updated:
             stats['updated_results'].append({
                 'row': index + 2,

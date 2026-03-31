@@ -125,7 +125,7 @@ def get_all_data():
             'surname': person.surname,
             'name': person.name,
             'patro': person.patro,
-            'fio': f'{person.name} {person.surname} {person.patro}',
+            'fio': f'{person.surname} {person.name} {person.patro}',
             'enrolled_class': person.enrolled_class,
             'enrolled_profile': person.enrolled_profile,
             'first_choice_id': profile_choice.first_choice_id if profile_choice else None,

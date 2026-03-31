@@ -23,13 +23,15 @@ function Login({ onLogin }) {
     }
   }, [searchParams]);
 
-  // 🔧 Валидация токена
+  // 🔧 Валидация токена из внешней системы
   const validateToken = async (token) => {
     setTokenLoading(true);
     setError('');
 
     try {
       const data = await authService.loginByToken(token);
+
+      // ✅ Успешная авторизация
       onLogin(data.user);
 
       // Редирект в зависимости от роли
@@ -40,9 +42,11 @@ function Login({ onLogin }) {
       }
     } catch (err) {
       console.error('Token validation error:', err);
+
+      // ❌ Ошибка токена
       setError('Ошибка входа по токену. Пожалуйста, войдите с помощью логина и пароля.');
 
-      // Очищаем URL от токена
+      // Очищаем URL от токена (редирект на чистый /login)
       navigate('/login', { replace: true });
     } finally {
       setTokenLoading(false);
@@ -76,7 +80,7 @@ function Login({ onLogin }) {
 
           <h1 className="h3 mb-3 fw-normal">Авторизация</h1>
 
-          {/* 🔧 Сообщение об ошибке токена */}
+          {/* 🔧 Сообщение об ошибке (токен или логин/пароль) */}
           {error && (
             <div className="alert alert-danger mt-3" role="alert">
               <i className="bi bi-exclamation-circle-fill me-2"></i>
@@ -84,7 +88,7 @@ function Login({ onLogin }) {
             </div>
           )}
 
-          {/* 🔧 Индикатор загрузки токена */}
+          {/* 🔧 Индикатор проверки токена */}
           {tokenLoading && (
             <div className="alert alert-info mt-3" role="alert">
               <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>

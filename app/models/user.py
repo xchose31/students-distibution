@@ -3,6 +3,7 @@ from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from flask_login import UserMixin
 from ..extensions import db
+from requests import get
 
 Base = db.Model
 
@@ -49,7 +50,33 @@ class User(Base, UserMixin):
     person = relationship("ComPerson", back_populates="user")
 
     def check_password(self, password):
-        return self.password == password
+        params = {
+            "ver": 1.0,
+            "get": "auth",
+            "username": self.username,
+            "password": password
+        }
+        req1 = get('https://lis.1502.moscow/api/auth.php', params=params)
+        if not req1.status_code == 200:
+            return False
+        params = {
+            "ver": 1.0,
+            "auth_code": req1.json()["auth_code"]
+        }
+        req2 = get('https://lis.1502.moscow/api/auth.php', params=params)
+        if not req2.status_code == 200:
+            return False
+        return True
+
+    def login_by_token(self, token):
+        params = {
+            "ver": 1.0,
+            "auth_code": token
+        }
+        req2 = get('https://lis.1502.moscow/api/auth.php', params=params)
+        if not req2.status_code == 200:
+            return False
+        return True
 
     def is_admin(self):
         """Проверка прав администратора"""

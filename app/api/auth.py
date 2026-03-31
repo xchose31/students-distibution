@@ -26,7 +26,6 @@ def login():
             expires_delta=timedelta(weeks=1) if remember_me else timedelta(hours=1)
         )
 
-        # 🔧 Возвращаем ФИО вместо только логина
         person = user.person
         return jsonify({
             "access_token": access_token,
@@ -34,17 +33,17 @@ def login():
                 "id": user.id,
                 "username": user.username,
                 "is_admin": person.emp_post.role.role == 'distribution' if person.emp_post else False,
-                "fio": f"{person.surname} {person.name} {person.patro}".strip() if person else user.username  # ← ФИО
+                "fio": f"{person.surname} {person.name} {person.patro}".strip() if person else user.username
             }
         }), 200
 
     return jsonify({"error": "Invalid credentials"}), 401
 
 
-@bp.route('/login-by-token', methods=['POST'])
+@bp.route('/login_by_token', methods=['POST'])
 def login_by_token():
     data = request.get_json()
-    token = data.get('token')
+    token = data.get('auth_code')
     if not token:
         return jsonify({"error": "There's no token"}), 400
     params = {

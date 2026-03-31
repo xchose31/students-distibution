@@ -32,7 +32,7 @@ function Data() {
       setProfiles(response.data?.profiles || []);
 
     } catch (err) {
-      console.error('Ошибка:', err);
+      console.error('Ошибка загрузки:', err);
       setError(err.response?.data?.error || 'Ошибка загрузки');
     } finally {
       setLoading(false);
@@ -41,8 +41,7 @@ function Data() {
 
   // Построение колонок
   useEffect(() => {
-    if (!subjects?.length || !profiles?.length) return;
-
+    // БАЗОВЫЕ КОЛОНКИ (всегда отображаются)
     const cols = [
       {
         headerName: 'ФИО',
@@ -70,54 +69,58 @@ function Data() {
         editable: true,
         cellEditor: 'agTextCellEditor',
         cellStyle: { backgroundColor: '#e3f2fd' }
-      },
-      {
-        headerName: '1 приоритет',
-        field: 'first_choice_name',
-        width: 180,
-        filter: true,
-        editable: true,
-        cellEditor: 'agSelectCellEditor',
-        cellEditorParams: {
-          values: ['', ...profiles.map(p => p.name).filter(Boolean)]
-        }
-      },
-      {
-        headerName: '2 приоритет',
-        field: 'second_choice_name',
-        width: 180,
-        filter: true,
-        editable: true,
-        cellEditor: 'agSelectCellEditor',
-        cellEditorParams: {
-          values: ['', ...profiles.map(p => p.name).filter(Boolean)]
-        }
-      },
-      {
-        headerName: '3 приоритет',
-        field: 'third_choice_name',
-        width: 180,
-        filter: true,
-        editable: true,
-        cellEditor: 'agSelectCellEditor',
-        cellEditorParams: {
-          values: ['', ...profiles.map(p => p.name).filter(Boolean)]
-        }
       }
     ];
 
-    // Добавляем предметы
-    subjects.forEach(subject => {
-      if (!subject?.id) return;
-      cols.push({
-        headerName: subject.name,
-        field: `result_${subject.id}`,
-        width: 100,
-        filter: true,
-        editable: true,
-        cellEditor: 'agNumberCellEditor'
+    // КОЛОНКИ ПРИОРИТЕТОВ (только если есть профили)
+    if (profiles?.length > 0) {
+      const profileValues = ['', ...profiles.map(p => p.name).filter(Boolean)];
+
+      cols.push(
+        {
+          headerName: '1 приоритет',
+          field: 'first_choice_name',
+          width: 180,
+          filter: true,
+          editable: true,
+          cellEditor: 'agSelectCellEditor',
+          cellEditorParams: { values: profileValues }
+        },
+        {
+          headerName: '2 приоритет',
+          field: 'second_choice_name',
+          width: 180,
+          filter: true,
+          editable: true,
+          cellEditor: 'agSelectCellEditor',
+          cellEditorParams: { values: profileValues }
+        },
+        {
+          headerName: '3 приоритет',
+          field: 'third_choice_name',
+          width: 180,
+          filter: true,
+          editable: true,
+          cellEditor: 'agSelectCellEditor',
+          cellEditorParams: { values: profileValues }
+        }
+      );
+    }
+
+    // КОЛОНКИ ПРЕДМЕТОВ (только если есть предметы)
+    if (subjects?.length > 0) {
+      subjects.forEach(subject => {
+        if (!subject?.id) return;
+        cols.push({
+          headerName: subject.name,
+          field: `result_${subject.id}`,
+          width: 100,
+          filter: true,
+          editable: true,
+          cellEditor: 'agNumberCellEditor'
+        });
       });
-    });
+    }
 
     setColumnDefs(cols);
   }, [subjects, profiles]);
@@ -126,10 +129,6 @@ function Data() {
   useEffect(() => {
     loadData();
   }, [loadData]);
-
-  // 🔧 УДАЛЕНО: useEffect с gridApi.setRowData (строка 149)
-  // В AG Grid v35 не нужно вызывать setRowData через API
-  // React state (rowData) автоматически обновляет таблицу
 
   // Обработка изменений ячеек
   const onCellValueChanged = async (event) => {
@@ -172,7 +171,6 @@ function Data() {
           updates
         });
 
-        // Обновляем локально для мгновенного отображения
         setRowData(prevData =>
           prevData.map(person => {
             if (person.person_id === personId) {
@@ -197,10 +195,6 @@ function Data() {
     }
   };
 
-  // 🔧 УДАЛЕНО: onGridReady с params.api.setRowData (строка 203)
-  // В AG Grid v35 это не нужно
-
-  // Экспорт в Excel
   const handleExport = async () => {
     setExporting(true);
     try {
@@ -271,7 +265,7 @@ function Data() {
 
       {error && <div className="alert alert-danger">{error}</div>}
 
-
+      {/* Таблица */}
       <div className="card">
         <div className="card-header">
           <h5 className="mb-0">Данные ({rowData?.length || 0} записей)</h5>
@@ -305,6 +299,22 @@ function Data() {
           )}
         </div>
       </div>
+
+      {/* Информационное сообщение */}
+      {rowData?.length > 0 && (subjects?.length === 0 || profiles?.length === 0) && (
+        <div className="alert alert-warning mt-3">
+          <i className="bi bi-exclamation-triangle me-2"></i>
+          <strong>Внимание:</strong>
+          <ul className="mb-0 mt-2">
+            {subjects?.length === 0 && (
+              <li>Предметы ещё не добавлены. Колонки с оценками не отображаются.</li>
+            )}
+            {profiles?.length === 0 && (
+              <li>Профили ещё не добавлены. Колонки с приоритетами не отображаются.</li>
+            )}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
