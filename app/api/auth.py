@@ -21,12 +21,13 @@ def login():
     user = User.query.filter_by(username=username).first()
     if user:
         print(user)
+        if user.check_password(password):
+            print("Пароль верный")
+        else:
+            print("Неверный пароль")
     else:
         print("User не найден в базе данных")
-    if user.check_password(password):
-        print("Пароль верный")
-    else:
-        print("Неверный пароль")
+
     if user and user.check_password(password):
         access_token = create_access_token(
             identity=str(user.id),
