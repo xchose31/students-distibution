@@ -1,6 +1,6 @@
 // admin_frontend/src/services/auth.js
 
-const API_URL = 'http://localhost:5000/api';
+const API_URL = 'http://lis.1502.moscow:5000/api';
 
 export const authService = {
   // Стандартный вход по логину/паролю
