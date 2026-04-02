@@ -57,6 +57,7 @@ class User(Base, UserMixin):
             "password": password
         }
         req1 = get('https://lis.1502.moscow/api/auth.php', params=params)
+        print(f"ЛИС на проверку пароля ответил: {req1.status_code}, {req1.text}")
         if not req1.status_code == 200:
             return False
         params = {
@@ -64,6 +65,7 @@ class User(Base, UserMixin):
             "auth_code": req1.json()["auth_code"]
         }
         req2 = get('https://lis.1502.moscow/api/auth.php', params=params)
+        print(f"ЛИС на проверку токена ответил: {req2.status_code}, {req2.text}")
         if not req2.status_code == 200:
             return False
         return True
@@ -91,6 +93,9 @@ class User(Base, UserMixin):
             'role': 'admin' if self.is_admin() else 'student',
             'is_admin': self.is_admin()
         }
+
+    def __repr__(self):
+        return f"ID:{self.id} {self.username} pers_id:{self.pers_id}"
 
 
 class EmpPost(Base):
