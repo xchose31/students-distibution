@@ -316,7 +316,12 @@ def export_data():
         for person in persons:
             # Результаты экзаменов
             exam_results = ExamResult.query.filter_by(person_id=person.id).all()
-            results_dict = {r.subject.name: r.result for r in exam_results}
+
+            results_dict = {
+                r.subject.name: r.result
+                for r in exam_results
+                if r.subject is not None
+            }
 
             # Выбор профилей
             profile_choice = ProfileChoice.query.filter_by(person_id=person.id).first()
@@ -325,6 +330,7 @@ def export_data():
                 'ФИО': f'{person.surname} {person.name} {person.patro}',
                 'Класс зачисления': person.enrolled_class or '',
                 'Профиль зачисления': person.enrolled_profile or '',
+                # 🔧 ИСПРАВЛЕНО: Дополнительная проверка на None
                 '1 приоритет': profile_choice.first_choice.name if profile_choice and profile_choice.first_choice else '',
                 '2 приоритет': profile_choice.second_choice.name if profile_choice and profile_choice.second_choice else '',
                 '3 приоритет': profile_choice.third_choice.name if profile_choice and profile_choice.third_choice else '',
@@ -375,4 +381,6 @@ def export_data():
 
     except Exception as e:
         print(f"❌ Ошибка экспорта: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": f"Ошибка экспорта: {str(e)}"}), 500
