@@ -92,9 +92,9 @@ def get_student_profile():
     exam_results = ExamResult.query.filter_by(person_id=person.id).all()
     results = [
         {
-            'subject_id': r.subject.id,
-            'subject_name': r.subject.name,
-            'result': r.result
+            'subject_id': r.subject.id if r.subject else None,
+            'subject_name': r.subject.name if r.subject else None,
+            'result': r.result if r.result else None
         }
         for r in exam_results
     ]
