@@ -14,19 +14,11 @@ def login():
     username = data.get('username')
     password = data.get('password')
     remember_me = data.get('remember_me', False)
-    print(f"Введенные данные: {username} - {password}")
     if not username or not password:
         return jsonify({"error": "Invalid credentials"}), 401
 
     user = User.query.filter_by(username=username).first()
-    if user:
-        print(user)
-        if user.check_password(password):
-            print("Пароль верный")
-        else:
-            print("Неверный пароль")
-    else:
-        print("User не найден в базе данных")
+
 
     if user and user.check_password(password):
         access_token = create_access_token(

@@ -6,9 +6,17 @@ from ..models.user import ClassProfile
 from ..models.user import SystemSetting
 from ..models.user import ProfileChoice
 from ..extensions import db
+import logging
 
 bp = Blueprint('student', __name__)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
 
 @bp.route('/profile-choice', methods=['GET', 'PUT'])
 @jwt_required()
@@ -81,48 +89,100 @@ def get_profiles():
 @bp.route('/profile', methods=['GET'])
 @jwt_required()
 def get_student_profile():
-    """
-    Получить полную информацию об ученике
-    """
-    current_user_id = get_jwt_identity()
-    user = User.query.get_or_404(int(current_user_id))
-    person = user.person
+    """Получить полную информацию об ученике"""
+    try:
+        current_user_id = get_jwt_identity()
+        logger.info(f"📥 [START] Запрос профиля для user_id={current_user_id}")
 
-    # Результаты экзаменов
-    exam_results = ExamResult.query.filter_by(person_id=person.id).all()
-    results = [
-        {
-            'subject_id': r.subject.id if r.subject else None,
-            'subject_name': r.subject.name if r.subject else None,
-            'result': r.result if r.result else None
+        # 1. Поиск пользователя
+        user = User.query.get(int(current_user_id))
+        if not user:
+            logger.error(f"❌ Пользователь с ID {current_user_id} не найден в БД")
+            return jsonify({"error": "Пользователь не найден"}), 404
+
+        person = user.person
+        if not person:
+            logger.error(f"❌ У пользователя {current_user_id} нет связанной записи ComPerson")
+            return jsonify({"error": "Профиль ученика не найден"}), 404
+
+        logger.info(f"✅ Пользователь найден: {person.surname} {person.name}, person_id={person.id}")
+
+        # 2. Получение результатов экзаменов
+        logger.info(f"🔍 Поиск результатов экзаменов для person_id={person.id}...")
+        exam_results = ExamResult.query.filter_by(person_id=person.id).all()
+        logger.info(f"📊 Найдено результатов: {len(exam_results)}")
+
+        results_list = []
+        for r in exam_results:
+            # 🔧 КРИТИЧЕСКАЯ ПРОВЕРКА
+            if r.subject is None:
+                logger.warning(f"⚠️ Результат экзамена ID={r.id} имеет NULL subject! Пропускаем.")
+                continue
+
+            logger.debug(f"   - Предмет: {r.subject.name}, Балл: {r.result}")
+            results_list.append({
+                'subject_id': r.subject.id,
+                'subject_name': r.subject.name,
+                'result': r.result
+            })
+
+        # 3. Расчет среднего балла
+        avg_score = None
+        if results_list:
+            total = sum(item['result'] for item in results_list)
+            avg_score = round(total / len(results_list), 2)
+            logger.info(f" Средний балл: {avg_score}")
+
+        # 4. Выбор профилей
+        profile_choice = ProfileChoice.query.filter_by(person_id=person.id).first()
+        choices_data = None
+        if profile_choice:
+            logger.info("✅ Выбор профилей найден")
+            # 🔧 ДОБавлена защита от ошибки, если выбор есть, а профиль внутри удален
+            try:
+                choices_data = {
+                    'first_choice': profile_choice.first_choice.name if profile_choice.first_choice else None,
+                    'second_choice': profile_choice.second_choice.name if profile_choice.second_choice else None,
+                    'third_choice': profile_choice.third_choice.name if profile_choice.third_choice else None
+                }
+            except AttributeError as e:
+                logger.error(f"Ошибка внутри выбора профилей: {e}")
+                choices_data = {'error': 'Некорректные данные выбора'}
+        else:
+            logger.info("ℹ️ Выбор профилей не найден (пусто)")
+
+        # 5. Формирование ответа
+        response_data = {
+            'person': {
+                'id': person.id,
+                'fio': f'{person.surname} {person.name} {person.patro}',
+                'surname': person.surname,
+                'name': person.name,
+                'patro': person.patro
+            },
+            'enrollment': {
+                'class': person.enrolled_class,
+                'profile': person.enrolled_profile
+            },
+            'profile_choices': choices_data,
+            'exam_results': results_list,
+            'avg_score': avg_score
         }
-        for r in exam_results
-    ]
 
+        logger.info(f"🚀 [SUCCESS] Отправляем ответ для user_id={current_user_id}")
+        return jsonify(response_data), 200
 
-    # Выбор профилей
-    profile_choice = ProfileChoice.query.filter_by(person_id=person.id).first()
+    except Exception as e:
+        # 🔧 ЛОВИМ ВСЕ ОШИБКИ
+        logger.error(f"💥 [CRITICAL ERROR] Ошибка при получении профиля user_id={current_user_id}", exc_info=True)
+        logger.error(f"Тип ошибки: {type(e).__name__}")
+        logger.error(f"Сообщение: {str(e)}")
 
-    response_data = {
-        'person': {
-            'id': person.id,
-            'fio': f'{person.surname} {person.name} {person.patro}',
-            'surname': person.surname,
-            'name': person.name,
-            'patro': person.patro
-        },
-        'enrollment': {
-            'class': person.enrolled_class,
-            'profile': person.enrolled_profile
-        },
-        'profile_choices': {
-            'first_choice': profile_choice.first_choice.name if profile_choice and profile_choice.first_choice else None,
-            'second_choice': profile_choice.second_choice.name if profile_choice and profile_choice.second_choice else None,
-            'third_choice': profile_choice.third_choice.name if profile_choice and profile_choice.third_choice else None
-        } if profile_choice else None,
-        'exam_results': results,
-        'avg_score': sum(r['result'] for r in results) / len(results) if results else None
-    }
+        # Исправление: используем current_app вместо app, так как app может быть не импортирован здесь
+        from flask import current_app
+        is_debug = current_app.config.get('FLASK_ENV') == 'development'
 
-
-    return jsonify(response_data), 200
+        return jsonify({
+            "error": "Внутренняя ошибка сервера",
+            "details": str(e) if is_debug else "Обратитесь к администратору"
+        }), 500
