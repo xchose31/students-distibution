@@ -63,12 +63,6 @@ def crud_profile_choice():
         if not first_choice_id:
             return jsonify({"error": "Выберите первый приоритет"}), 400
 
-        # Проверка на дубликаты
-        choices = [first_choice_id, second_choice_id, third_choice_id]
-        choices = [c for c in choices if c]  # Убираем None
-        if len(choices) != len(set(choices)):
-            return jsonify({"error": "Профили не могут совпадать"}), 400
-
         if profile_choice:
             profile_choice.first_choice_id = first_choice_id
             profile_choice.second_choice_id = second_choice_id

@@ -65,12 +65,7 @@ function ProfileChoice() {
       return;
     }
 
-    // Проверка на дубликаты
-    const choices = [firstChoice, secondChoice, thirdChoice];
-    if (new Set(choices).size !== choices.length) {
-      setError('Профили не могут совпадать');
-      return;
-    }
+    // Проверка на дубликаты удалена - профили могут повторяться
 
     try {
       await api.put('/profile-choice', {
@@ -125,7 +120,7 @@ function ProfileChoice() {
         <div className="card-body">
           <div className="alert alert-info mb-3">
             <i className="bi bi-info-circle me-2"></i>
-            <strong>Внимание:</strong> Необходимо выбрать ровно 3 профиля. Все приоритеты обязательны для заполнения.
+            <strong>Внимание:</strong> Необходимо выбрать 3 профиля для поступления в 10 класс. Приоритеты могут совпадать.
           </div>
 
           <form onSubmit={handleSubmit}>
