@@ -7,15 +7,29 @@ from ..models.user import SystemSetting
 from ..models.user import ProfileChoice
 from ..extensions import db
 import logging
+from logging.handlers import RotatingFileHandler
+import os
 
 bp = Blueprint('student', __name__)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 if not logger.handlers:
-    handler = logging.StreamHandler()
+    # Создаем директорию для логов, если она не существует
+    log_dir = 'logs'
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    
+    # RotatingFileHandler: ротация при достижении 10 МБ, храним до 5 файлов
+    handler = RotatingFileHandler(
+        os.path.join(log_dir, 'student_profile.log'),
+        maxBytes=10 * 1024 * 1024,  # 10 МБ
+        backupCount=5,              # Хранить до 5 старых файлов
+        encoding='utf-8'
+    )
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     handler.setFormatter(formatter)
+    handler.setLevel(logging.DEBUG)
     logger.addHandler(handler)
 
 @bp.route('/profile-choice', methods=['GET', 'PUT'])
